@@ -1,14 +1,12 @@
 import SwiftUI
 
-/// The posture pet: a speech bubble + placeholder SF Symbol character that
-/// slides in from the right. `isPresented` drives the slide/fade transition.
+/// The posture pet: a speech bubble + placeholder SF Symbol character.
+/// Rendered statically; slide/fade is driven by PetOverlayWindowController.
 struct PetView: View {
     let message: String
-    @Binding var isPresented: Bool
 
-    init(message: String, isPresented: Binding<Bool> = .constant(true)) {
+    init(message: String) {
         self.message = message
-        self._isPresented = isPresented
     }
 
     var body: some View {
@@ -25,9 +23,6 @@ struct PetView: View {
                 .overlay(Circle().strokeBorder(.orange.opacity(0.4), lineWidth: 2))
         }
         .padding(16)
-        .offset(x: isPresented ? 0 : 260)
-        .opacity(isPresented ? 1 : 0)
-        .animation(.spring(response: 0.5, dampingFraction: 0.72), value: isPresented)
     }
 }
 
