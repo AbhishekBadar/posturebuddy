@@ -5,8 +5,9 @@ friendly pet to nag you when you slouch.
 
 ## How it works
 
-PostureBuddy reuses the **AirPostureCore** engine (from the sibling `AirPosture`
-project) to read AirPods head-tilt via `CMHeadphoneMotionManager`. When your head
+PostureBuddy uses the **AirPostureCore** engine — a self-contained Swift package
+vendored into this project (`AirPostureCore/`, MIT licensed) — to read AirPods
+head-tilt via `CMHeadphoneMotionManager`. When your head
 stays tilted past your calibrated threshold for ~5 seconds, an animated pet slides
 into the bottom-right corner of your screen and asks you to sit up straight. It
 walks off automatically once you've held good posture for a couple of seconds.
@@ -45,6 +46,7 @@ xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'
 
 - The pet uses **placeholder SF Symbol art**. Swap `PetView.swift`'s `Image` for
   real sprites when available.
-- `AirPostureCore` is referenced by relative path (`../AirPosture/AirPostureCore`);
-  keep the sibling project alongside this folder.
+- `AirPostureCore` is vendored locally at `AirPostureCore/` (a self-contained SPM
+  package, MIT licensed) and referenced by `project.yml`; this project has no
+  external project dependencies.
 - Depends on nothing over the network; no analytics.

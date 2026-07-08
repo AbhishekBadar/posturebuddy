@@ -7,7 +7,7 @@ options:
 
 packages:
   AirPostureCore:
-    path: ../AirPosture/AirPostureCore
+    path: AirPostureCore
 
 targets:
   PostureBuddy:
