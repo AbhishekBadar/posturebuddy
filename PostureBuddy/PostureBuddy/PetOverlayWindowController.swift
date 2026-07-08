@@ -57,8 +57,10 @@ final class PetOverlayWindowController {
             panel.animator().setFrame(NSRect(x: offX, y: y, width: size.width, height: size.height), display: true)
             panel.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
-            guard let self, !self.isPresented else { return }
-            self.panel?.orderOut(nil)
+            MainActor.assumeIsolated {
+                guard let self, !self.isPresented else { return }
+                self.panel?.orderOut(nil)
+            }
         })
     }
 
