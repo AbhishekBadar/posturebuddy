@@ -49,6 +49,20 @@ final class PostureMonitorTests: XCTestCase {
         XCTAssertEqual(m.petState, .hidden)
     }
 
+    func testPoorBlipDuringRecoveryRestartsRecoveryTimer() {
+        let m = makeMonitor()
+        feed(m, .poor, at: 0)
+        feed(m, .poor, at: 5.0)    // nagging
+        feed(m, .good, at: 6.0)    // recovery starts at 6.0
+        feed(m, .poor, at: 6.5)    // poor interrupts; recovery clock must reset
+        XCTAssertEqual(m.petState, .nagging)
+        feed(m, .good, at: 7.0)    // recovery restarts at 7.0
+        feed(m, .good, at: 8.5)    // 1.5s from 7.0 < 2s → still nagging (proves reset, not carry-over from 6.0)
+        XCTAssertEqual(m.petState, .nagging)
+        feed(m, .good, at: 9.0)    // 2.0s from 7.0 → dismiss
+        XCTAssertEqual(m.petState, .hidden)
+    }
+
     func testGoodBlipDuringSlouchResetsGraceTimer() {
         let m = makeMonitor()
         feed(m, .poor, at: 0)
