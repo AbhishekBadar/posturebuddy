@@ -50,7 +50,11 @@ final class GIFPlayerView: NSImageView {
     }
 
     private func showFrame(_ i: Int) {
-        guard let source, let cg = CGImageSourceCreateImageAtIndex(source, i, nil) else { return }
+        // shouldCache=false: each frame is shown once per play; the default (true)
+        // would retain every decoded 1280x720 frame in the image source
+        // (~190 MB after a full 54-frame play).
+        let options = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source, let cg = CGImageSourceCreateImageAtIndex(source, i, options) else { return }
         image = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
     }
 
