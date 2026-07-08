@@ -19,6 +19,11 @@ targets:
       - package: AirPostureCore
     info:
       path: PostureBuddy/Info.plist
+      properties:
+        CFBundleName: PostureBuddy
+        LSMinimumSystemVersion: "14.0"
+        LSUIElement: true
+        NSMotionUsageDescription: PostureBuddy reads AirPods head motion to detect slouching.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.posturebuddy
