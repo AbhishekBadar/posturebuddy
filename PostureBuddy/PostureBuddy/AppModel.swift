@@ -51,7 +51,7 @@ final class AppModel: ObservableObject {
             .sink { [weak self] state in
                 guard let self else { return }
                 switch state {
-                case .nagging: self.overlay.show(message: "Sit up straight!")
+                case .nagging: self.overlay.show()
                 case .hidden:  self.overlay.hide()
                 }
             }
