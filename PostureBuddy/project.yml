@@ -1,0 +1,53 @@
+name: PostureBuddy
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+packages:
+  AirPostureCore:
+    path: ../AirPosture/AirPostureCore
+
+targets:
+  PostureBuddy:
+    type: application
+    platform: macOS
+    sources:
+      - PostureBuddy
+    dependencies:
+      - package: AirPostureCore
+    info:
+      path: PostureBuddy/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.posturebuddy
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_HARDENED_RUNTIME: YES
+
+  PostureBuddyTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - PostureBuddyTests
+    dependencies:
+      - target: PostureBuddy
+      - package: AirPostureCore
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+
+schemes:
+  PostureBuddy:
+    build:
+      targets:
+        PostureBuddy: all
+        PostureBuddyTests: [test]
+    run:
+      config: Debug
+    test:
+      targets:
+        - PostureBuddyTests
