@@ -15,7 +15,7 @@ import SwiftUI
 @MainActor
 final class PetOverlayWindowController {
     private var panel: NSPanel?
-    private var imageView: NSImageView?
+    private var imageView: GIFPlayerView?
     private var bubbleHost: NSHostingView<SpeechBubbleView>?
     private var isPresented = false
     private var bubbleWorkItem: DispatchWorkItem?
@@ -33,12 +33,8 @@ final class PetOverlayWindowController {
         let panel = ensurePanel()
         layout(panel)
 
-        // Fresh NSImage so the walk-in animation restarts from frame 0.
-        if let url = Bundle.main.url(forResource: "posturebuddy", withExtension: "gif"),
-           let image = NSImage(contentsOf: url) {
-            imageView?.image = image
-            imageView?.animates = true
-        }
+        // Play the GIF once from frame 0 (the walk-in), then hold the last frame.
+        imageView?.playOnce()
 
         // Bubble starts hidden and fades in after the character walks in.
         bubbleHost?.alphaValue = 0
@@ -73,7 +69,8 @@ final class PetOverlayWindowController {
             MainActor.assumeIsolated {
                 guard let self, !self.isPresented else { return }
                 self.panel?.orderOut(nil)
-                self.imageView?.image = nil       // stop animating while hidden
+                self.imageView?.stop()            // stop playback while hidden
+                self.imageView?.image = nil
                 self.bubbleHost?.alphaValue = 0
             }
         })
@@ -99,9 +96,11 @@ final class PetOverlayWindowController {
 
         let container = NSView(frame: NSRect(origin: .zero, size: panel.frame.size))
 
-        let iv = NSImageView()
+        let iv = GIFPlayerView()
         iv.imageScaling = .scaleProportionallyUpOrDown
-        iv.animates = true
+        if let url = Bundle.main.url(forResource: "posturebuddy", withExtension: "gif") {
+            iv.loadGIF(url: url)
+        }
         container.addSubview(iv)
         self.imageView = iv
 
