@@ -27,9 +27,9 @@ struct MenuBarContentView: View {
                 ) {
                     Text("Sensitivity")
                 } minimumValueLabel: {
-                    Text("Strict")
-                } maximumValueLabel: {
                     Text("Relaxed")
+                } maximumValueLabel: {
+                    Text("Strict")
                 }
                 Text("Threshold: \(Int(model.threshold))° head tilt")
                     .font(.caption)

@@ -100,9 +100,10 @@ final class AppModel: ObservableObject {
     }
 
     func saveCalibration() {
-        if let config = tracker.saveCalibrationResult() {
-            threshold = config.poorPostureThreshold
-            settings.poorPostureThreshold = config.poorPostureThreshold
+        if tracker.saveCalibrationResult() != nil {
+            // saveCalibrationResult() has written the raw computed threshold into
+            // tracker.configuration; clamp + persist it consistently via applyThreshold.
+            applyThreshold(tracker.configuration.poorPostureThreshold)
             settings.hasCalibrated = true
         }
         monitor.isMonitoring = isMonitoring

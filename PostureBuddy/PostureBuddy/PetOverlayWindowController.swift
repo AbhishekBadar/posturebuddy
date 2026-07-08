@@ -19,6 +19,7 @@ final class PetOverlayWindowController {
         isPresented = true
 
         guard let screen = NSScreen.main else {
+            panel.alphaValue = 1
             panel.orderFrontRegardless()
             return
         }
