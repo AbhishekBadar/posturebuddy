@@ -24,7 +24,7 @@ final class PetOverlayWindowController {
     private let gifAspect: CGFloat = 1280.0 / 720.0   // GIF native canvas is 1280x720
     private let maxGifHeight: CGFloat = 360           // on-screen height of the GIF
     private let bubbleHeadroom: CGFloat = 80          // vertical space above the GIF for the bubble
-    private let bubbleDelay: TimeInterval = 0.8       // wait for the walk-in before showing the bubble
+    private let bubbleFallbackDelay: TimeInterval = 0.8  // used only if the GIF duration is unknown
     private let bubbleHeadFractionX: CGFloat = 0.5    // horizontal anchor over the standing head (0=left,1=right of GIF)
     private let rightBleedFraction: CGFloat = 0.20    // push panel off the right screen edge toward the corner
     private let bottomMargin: CGFloat = 0             // gap between the pet's feet and the screen bottom
@@ -36,7 +36,8 @@ final class PetOverlayWindowController {
         // Play the GIF once from frame 0 (the walk-in), then hold the last frame.
         imageView?.playOnce()
 
-        // Bubble starts hidden and fades in after the character walks in.
+        // Bubble stays hidden until the GIF finishes its single play — that's the
+        // moment the character "says" the line — then fades in.
         bubbleHost?.alphaValue = 0
         bubbleWorkItem?.cancel()
         let work = DispatchWorkItem { [weak self] in
@@ -47,6 +48,8 @@ final class PetOverlayWindowController {
             }
         }
         bubbleWorkItem = work
+        let gifDuration = imageView?.totalDuration ?? 0
+        let bubbleDelay = gifDuration > 0 ? gifDuration : bubbleFallbackDelay
         DispatchQueue.main.asyncAfter(deadline: .now() + bubbleDelay, execute: work)
 
         isPresented = true

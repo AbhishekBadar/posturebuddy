@@ -13,6 +13,9 @@ final class GIFPlayerView: NSImageView {
     private var index = 0
     private var timer: Timer?
 
+    /// Total play time of one pass through the GIF (sum of frame delays).
+    private(set) var totalDuration: TimeInterval = 0
+
     /// Load a GIF and precompute its per-frame delays. Does not start playback.
     func loadGIF(url: URL) {
         stop()
@@ -20,6 +23,7 @@ final class GIFPlayerView: NSImageView {
             source = nil
             frameCount = 0
             durations = []
+            totalDuration = 0
             return
         }
         source = src
@@ -32,6 +36,7 @@ final class GIFPlayerView: NSImageView {
                 ?? 0.05
             return delay > 0 ? delay : 0.05
         }
+        totalDuration = durations.reduce(0, +)
     }
 
     /// Restart from frame 0 and play through once, holding the final frame.
