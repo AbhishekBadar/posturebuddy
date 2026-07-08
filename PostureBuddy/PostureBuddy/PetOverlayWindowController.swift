@@ -24,6 +24,7 @@ final class PetOverlayWindowController {
     private let gifAspect: CGFloat = 1280.0 / 720.0   // GIF native canvas is 1280x720
     private let maxGifHeight: CGFloat = 360           // on-screen height of the GIF
     private let bubbleHeadroom: CGFloat = 80          // vertical space above the GIF for the bubble
+    private let bubbleLeadIn: TimeInterval = 1.0      // show the bubble this long before the GIF ends
     private let bubbleFallbackDelay: TimeInterval = 0.8  // used only if the GIF duration is unknown
     private let bubbleHeadFractionX: CGFloat = 0.5    // horizontal anchor over the standing head (0=left,1=right of GIF)
     private let rightBleedFraction: CGFloat = 0.20    // push panel off the right screen edge toward the corner
@@ -49,7 +50,7 @@ final class PetOverlayWindowController {
         }
         bubbleWorkItem = work
         let gifDuration = imageView?.totalDuration ?? 0
-        let bubbleDelay = gifDuration > 0 ? gifDuration : bubbleFallbackDelay
+        let bubbleDelay = gifDuration > 0 ? max(0, gifDuration - bubbleLeadIn) : bubbleFallbackDelay
         DispatchQueue.main.asyncAfter(deadline: .now() + bubbleDelay, execute: work)
 
         isPresented = true
