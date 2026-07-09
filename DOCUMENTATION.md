@@ -1,9 +1,12 @@
 # PostureBuddy — Project Documentation
 
 A native macOS **menu-bar app** that watches your sitting posture through your
-**AirPods** and, when you slouch, sends an animated pixel character walking onto
-your screen to tell you to **"Sit straight!"** — then walks away (fades out) once
-you've corrected yourself.
+**AirPods** and, when you slouch, sends a **pixel-art version of you** walking onto
+your screen to tell you to **"Sit straight!"** — which then fades out once you've
+corrected yourself.
+
+The character is just a bundled GIF, so anyone can drop in a pixel avatar of
+themselves (see §7).
 
 No camera, no network, no analytics. Everything runs locally.
 
@@ -16,11 +19,11 @@ No camera, no network, no analytics. Everything runs locally.
 2. **Calibration** — you sit up straight for ~5 s, then slouch for ~5 s. The app
    computes a personalized head-tilt threshold from the two averages and saves it.
 3. **Monitoring** — with AirPods in, the app continuously reads your head pitch.
-   - Slouch past your threshold and *stay* slouched for **5 seconds** → the pet
-     GIF appears bottom-right: it **walks in from the right edge, stops, stands**,
+   - Slouch past your threshold and *stay* slouched for **5 seconds** → your pixel-art
+     character appears bottom-right: it **walks in from the right edge, stops, stands**,
      and a **"Sit straight!" speech bubble** pops up ~1 s before the walk animation
      ends. The character then stays frozen, staring at you.
-   - Sit up straight and *hold it* for **2 seconds** → the pet fades out.
+   - Sit up straight and *hold it* for **2 seconds** → the character fades out.
 4. **Menu bar** — click the icon for: connection status, a **Monitor my posture**
    toggle, a **Sensitivity** slider (Relaxed ↔ Strict), **Recalibrate…**, and Quit.
 
@@ -79,7 +82,7 @@ interrupt whatever you're doing.
 | `PostureMonitor` | `PostureBuddy/PostureMonitor.swift` | The nag decision. Pure, injectable-time hysteresis: `.poor` sustained ≥ **5 s** → `.nagging`; then `.good` sustained ≥ **2 s** → `.hidden`. Any disconnect or pause instantly hides and resets. Fully unit-tested. |
 | `PetState` | `PostureBuddy/PetState.swift` | Two-case enum: `.hidden` / `.nagging`. |
 | `AppSettings` | `PostureBuddy/AppSettings.swift` | `UserDefaults` persistence for `poorPostureThreshold` (defaults to −22°) and `hasCalibrated`. Unit-tested. |
-| `PetOverlayWindowController` | `PostureBuddy/PetOverlayWindowController.swift` | The on-screen pet. Borderless, transparent, **non-activating**, **click-through** `NSPanel` (floating level, joins all Spaces, works over full-screen apps). Positions bottom-right with the character entering from the screen edge. Fades in/out; schedules the speech bubble. |
+| `PetOverlayWindowController` | `PostureBuddy/PetOverlayWindowController.swift` | The on-screen character. Borderless, transparent, **non-activating**, **click-through** `NSPanel` (floating level, joins all Spaces, works over full-screen apps). Positions bottom-right with the character entering from the screen edge. Fades in/out; schedules the speech bubble. |
 | `GIFPlayerView` | `PostureBuddy/GIFPlayerView.swift` | Custom `NSImageView` that plays the GIF **exactly once and freezes on the last frame** (no looping). Decodes frames on demand with `shouldCache: false` (~one frame in memory). Exposes `totalDuration` from real frame delays. |
 | `SpeechBubbleView` | `PostureBuddy/SpeechBubbleView.swift` | SwiftUI white rounded bubble + tail with the "Sit straight!" text (the GIF art has no text of its own). |
 | `MenuBarContentView` | `PostureBuddy/MenuBarContentView.swift` | Menu-bar popover UI: status, monitor toggle, sensitivity slider (−35…−5°), Recalibrate…, Quit. |
@@ -111,8 +114,8 @@ The sensitivity slider and calibration both write the same value:
 | GIF | 1280×720, 54 frames, ~3.6 s, transparent background | `Resources/posturebuddy.gif` |
 | GIF playback | Once per appearance, holds last frame | `GIFPlayerView.playOnce()` |
 | Bubble timing | appears **1 s before** the GIF ends | `bubbleLeadIn` |
-| Pet size / position | ≤360 pt tall, bottom-right, 20% bled off the right edge | overlay tunables |
-| Disconnect / pause | pet hides immediately | `PostureMonitor.reset()` |
+| Character size / position | ≤360 pt tall, bottom-right, 20% bled off the right edge | overlay tunables |
+| Disconnect / pause | character hides immediately | `PostureMonitor.reset()` |
 
 **Overlay tunables** (top of `PetOverlayWindowController.swift`): `maxGifHeight`,
 `bubbleHeadroom`, `bubbleLeadIn`, `bubbleHeadFractionX`, `rightBleedFraction`,
@@ -162,7 +165,7 @@ Notes:
   `AppSettings` (2 tests — default fallback, persistence round-trip) via isolated
   `UserDefaults` suites. The core package has its own 8 tests using
   `MockHeadphoneMotionProvider`.
-- **Manually verified (needs real AirPods + GUI):** pet appearance/dismissal,
+- **Manually verified (needs real AirPods + GUI):** character appearance/dismissal,
   focus/click-through behavior, calibration walkthrough, slider feel.
 
 ---
@@ -179,9 +182,10 @@ posturebuddy/                        (git repo root = the project)
 │   ├── Sources/AirPostureCore/      AirPostureTracker, Types, MotionProvider
 │   └── Tests/AirPostureCoreTests/
 ├── PostureBuddy/                    app sources (see component table)
-│   └── Resources/posturebuddy.gif   the bundled pet GIF
+│   └── Resources/posturebuddy.gif   the bundled character GIF
 ├── PostureBuddyTests/               PostureMonitorTests, AppSettingsTests
-├── assets/                          source GIF (art source of truth)
+├── assets/                          posturebuddy.gif (art source of truth)
+│                                    demo.gif (README preview, opaque bg)
 ├── docs/superpowers/                design spec + implementation plan (history)
 └── .superpowers/sdd/                task-by-task build ledger (history)
 ```
@@ -196,13 +200,13 @@ final whole-branch review. Highlights of what the reviews caught and fixed:
 
 - XcodeGen was silently regenerating (wiping) the hand-written `Info.plist` →
   moved keys into `info.properties`.
-- The pet originally "popped" instead of animating (SwiftUI `.animation` can't
+- The character originally "popped" instead of animating (SwiftUI `.animation` can't
   fire across remounted hosting views) → moved animation to AppKit.
 - Inverted "Strict/Relaxed" slider labels (threshold math direction).
 - A main-actor isolation hole in an animation completion handler.
 - Calibration results weren't clamped to the slider range.
 
-Evolution of the pet: SF Symbol placeholder + drawn speech bubble → animated GIF
+Evolution of the character: SF Symbol placeholder + drawn speech bubble → animated GIF
 (opaque) → **transparent GIF** walking in from the right corner → play-once with
 freeze-frame → bubble timed to the end of the walk (1 s lead-in).
 
@@ -213,7 +217,33 @@ and per-sample copy-on-write of an unused 50-sample pitch-history buffer.
 
 ---
 
-## 7. Privacy, footprint, licensing
+## 7. Customizing the character
+
+The character is not hardcoded — it's a single animated GIF at
+`PostureBuddy/Resources/posturebuddy.gif` (source art kept in `assets/`). To make
+it a pixel-art version of *you*, replace that file. Nothing else needs to change:
+`GIFPlayerView` reads the frame count and per-frame delays from the GIF itself, and
+`PetOverlayWindowController` times the speech bubble off the GIF's own duration.
+
+For it to look right, the GIF should:
+
+- have a **transparent background** — otherwise it renders as an opaque rectangle
+  on your desktop instead of a character standing on it;
+- **walk in from the right and end standing**, because the GIF is played exactly
+  once per nag and then freezes on its final frame;
+- keep a **16:9-ish canvas** with the character roughly centered — the overlay
+  assumes `gifAspect` (default `1280/720`) and bleeds the empty right portion of
+  the canvas off the screen edge so the character enters from the corner.
+
+If your GIF has different proportions, adjust the tunables at the top of
+`PetOverlayWindowController.swift`: `gifAspect`, `maxGifHeight` (character size),
+`rightBleedFraction` (how far into the corner it enters), `bubbleHeadFractionX`
+(bubble position over the head), `bubbleHeadroom`, `bubbleLeadIn` (how long before
+the walk ends the bubble appears), and `bottomMargin`.
+
+---
+
+## 8. Privacy, footprint, licensing
 
 - **Privacy:** motion data never leaves the device; no network calls, no
   analytics, no camera. The only permission used is headphone motion
@@ -227,12 +257,12 @@ and per-sample copy-on-write of an unused 50-sample pitch-history buffer.
   notice at `AirPostureCore/LICENSE` remains with the code. App-level code has
   no other third-party dependencies.
 
-## 8. Known limitations / future ideas
+## 9. Known limitations / future ideas
 
 - Detection is head-pitch only — it can't distinguish "looking down at a book"
   from slouching (mitigated by the 5 s grace period and calibration).
-- The pet appears on the **main display** only (multi-monitor picks `NSScreen.main`).
+- The character appears on the **main display** only (multi-monitor picks `NSScreen.main`).
 - First-run calibration opens on first *menu open*, not raw process launch.
 - No launch-at-login yet; no escalation (bigger nag if you ignore it); no
   posture stats/history. An `AppModel`-level integration test (mock motion
-  provider → pet state) is a noted follow-up.
+  provider → character state) is a noted follow-up.

@@ -1,16 +1,26 @@
 # PostureBuddy
 
-A macOS menu-bar app that watches your posture through your AirPods and sends a
-friendly pet to nag you when you slouch.
+A macOS menu-bar app that watches your posture through your AirPods. When you
+slouch, a pixel-art version of *you* walks onto your screen and tells you to sit
+straight.
+
+<p align="center">
+  <img src="assets/demo.gif" alt="A pixel-art character walking in from the right to remind you to sit straight" width="480">
+</p>
+
+<p align="center">
+  <em>Slouch for 5 seconds and your pixel self walks in from the corner of your screen.</em>
+</p>
 
 ## How it works
 
 PostureBuddy uses the **AirPostureCore** engine — a self-contained Swift package
 vendored into this project (`AirPostureCore/`, MIT licensed) — to read AirPods
-head-tilt via `CMHeadphoneMotionManager`. When your head
-stays tilted past your calibrated threshold for ~5 seconds, an animated pet slides
-into the bottom-right corner of your screen and asks you to sit up straight. It
-walks off automatically once you've held good posture for a couple of seconds.
+head-tilt via `CMHeadphoneMotionManager`. When your head stays tilted past your
+calibrated threshold for ~5 seconds, your pixel-art character walks in from the
+bottom-right corner of your screen, stops, and holds up a **"Sit straight!"**
+speech bubble. It waits there — click-through, never stealing focus — until you've
+held good posture for a couple of seconds, then fades away.
 
 ## Requirements
 
@@ -43,8 +53,13 @@ xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'   # 10 app te
 
 ## Notes
 
-- The pet uses **placeholder SF Symbol art**. Swap `PetView.swift`'s `Image` for
-  real sprites when available.
+- **Make it look like you.** The character is just an animated GIF bundled at
+  `PostureBuddy/Resources/posturebuddy.gif` (source art in `assets/`). Swap in a
+  pixel-art GIF of yourself and it works: `GIFPlayerView` reads the frame count and
+  delays from the GIF, and the speech bubble is timed off its duration. Use a
+  **transparent background** so the character floats on your desktop; have it walk
+  in from the right and end standing, since it plays once and holds the last frame.
+  Layout knobs are at the top of `PetOverlayWindowController.swift`.
 - `AirPostureCore` is vendored locally at `AirPostureCore/` (a self-contained SPM
   package, MIT licensed) and referenced by `project.yml`; this project has no
   external project dependencies.
