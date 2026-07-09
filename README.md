@@ -22,7 +22,6 @@ walks off automatically once you've held good posture for a couple of seconds.
 ## Build & run
 
 ```bash
-cd PostureBuddy
 xcodegen generate
 open PostureBuddy.xcodeproj   # then Run, or:
 xcodebuild -scheme PostureBuddy -destination 'platform=macOS' build
@@ -31,8 +30,8 @@ xcodebuild -scheme PostureBuddy -destination 'platform=macOS' build
 ## Test
 
 ```bash
-cd PostureBuddy
-xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'
+xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'   # 10 app tests
+(cd AirPostureCore && swift test)                                    # 8 engine tests
 ```
 
 ## Menu

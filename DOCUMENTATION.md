@@ -130,8 +130,9 @@ live. `PostureMonitor` simply ignores samples while paused.
 
 ## 4. Build, run, test
 
+All commands run from the repository root.
+
 ```bash
-cd PostureBuddy
 xcodegen generate                 # project.yml is the source of truth
 open PostureBuddy.xcodeproj       # then Run  — or:
 xcodebuild -scheme PostureBuddy -destination 'platform=macOS' build
@@ -141,7 +142,7 @@ Tests (10 app tests + 8 vendored-core tests):
 
 ```bash
 xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'
-cd AirPostureCore && swift test
+(cd AirPostureCore && swift test)
 ```
 
 Notes:
@@ -169,19 +170,18 @@ Notes:
 ## 5. Project layout
 
 ```
-posturebuddy/                        (git repo root)
-├── PostureBuddy/                    the app — fully self-contained
-│   ├── project.yml                  XcodeGen manifest (app + test targets)
-│   ├── README.md                    quick-start readme
-│   ├── DOCUMENTATION.md             this document
-│   ├── AirPostureCore/              vendored SPM package (engine) + LICENSE
-│   │   ├── Package.swift
-│   │   ├── Sources/AirPostureCore/  AirPostureTracker, Types, MotionProvider
-│   │   └── Tests/AirPostureCoreTests/
-│   ├── PostureBuddy/                app sources (see component table)
-│   │   └── Resources/posturebuddy.gif
-│   ├── PostureBuddyTests/           PostureMonitorTests, AppSettingsTests
-│   └── assets/                      (untracked) source gif/mp4 media
+posturebuddy/                        (git repo root = the project)
+├── project.yml                      XcodeGen manifest (app + test targets)
+├── README.md                        quick-start readme
+├── DOCUMENTATION.md                 this document
+├── AirPostureCore/                  vendored SPM package (engine) + LICENSE
+│   ├── Package.swift
+│   ├── Sources/AirPostureCore/      AirPostureTracker, Types, MotionProvider
+│   └── Tests/AirPostureCoreTests/
+├── PostureBuddy/                    app sources (see component table)
+│   └── Resources/posturebuddy.gif   the bundled pet GIF
+├── PostureBuddyTests/               PostureMonitorTests, AppSettingsTests
+├── assets/                          source GIF (art source of truth)
 ├── docs/superpowers/                design spec + implementation plan (history)
 └── .superpowers/sdd/                task-by-task build ledger (history)
 ```
