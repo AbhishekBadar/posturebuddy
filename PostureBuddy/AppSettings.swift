@@ -8,6 +8,7 @@ final class AppSettings {
     private enum Keys {
         static let threshold = "poorPostureThreshold"
         static let hasCalibrated = "hasCalibrated"
+        static let soundEnabled = "soundEnabled"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -25,5 +26,13 @@ final class AppSettings {
                 ?? AirPostureConfiguration.default.poorPostureThreshold
         }
         set { defaults.set(newValue, forKey: Keys.threshold) }
+    }
+
+    /// Whether the character's sound effect plays. Defaults to on.
+    /// Read via `object(forKey:)` because `bool(forKey:)` reports `false` for an
+    /// unset key, which would silently default the sound to off.
+    var soundEnabled: Bool {
+        get { defaults.object(forKey: Keys.soundEnabled) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Keys.soundEnabled) }
     }
 }

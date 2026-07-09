@@ -18,9 +18,16 @@ PostureBuddy uses the **AirPostureCore** engine — a self-contained Swift packa
 vendored into this project (`AirPostureCore/`, MIT licensed) — to read AirPods
 head-tilt via `CMHeadphoneMotionManager`. When your head stays tilted past your
 calibrated threshold for ~5 seconds, your pixel-art character walks in from the
-bottom-right corner of your screen, stops, and holds up a **"Sit straight!"**
-speech bubble. It waits there — click-through, never stealing focus — until you've
-held good posture for a couple of seconds, then fades away.
+bottom-right corner of your screen, stops, yells at you, and holds up a speech
+bubble roasting your posture:
+
+> *Nice hunchback. Very medieval.*
+> *You're folding like a cheap lawn chair.*
+> *Gravity: 1. You: 0.*
+
+A random line every time, never the same one twice in a row. It waits there —
+click-through, never stealing focus — until you've held good posture for a couple
+of seconds, then fades away. Sound can be muted from the menu.
 
 ## Requirements
 
@@ -40,13 +47,14 @@ xcodebuild -scheme PostureBuddy -destination 'platform=macOS' build
 ## Test
 
 ```bash
-xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'   # 10 app tests
+xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'   # 15 app tests
 (cd AirPostureCore && swift test)                                    # 8 engine tests
 ```
 
 ## Menu
 
 - **Monitor my posture** — pause/resume nagging
+- **Play sound** — mute the character's sound effect
 - **Sensitivity** — adjust the head-tilt threshold (Strict ↔ Relaxed)
 - **Recalibrate…** — re-run the guided good/slouch calibration
 - **Quit**
@@ -60,6 +68,8 @@ xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'   # 10 app te
   **transparent background** so the character floats on your desktop; have it walk
   in from the right and end standing, since it plays once and holds the last frame.
   Layout knobs are at the top of `PetOverlayWindowController.swift`.
+- **Make it say your own things.** Edit `NagMessages.all`. The sound effect is
+  `PostureBuddy/Resources/faaah.mp3` — replace the file to change it.
 - `AirPostureCore` is vendored locally at `AirPostureCore/` (a self-contained SPM
   package, MIT licensed) and referenced by `project.yml`; this project has no
   external project dependencies.

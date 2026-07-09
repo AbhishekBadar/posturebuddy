@@ -18,6 +18,20 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertFalse(settings.hasCalibrated)
     }
 
+    func testSoundEnabledDefaultsToTrueWhenUnset() {
+        let settings = AppSettings(defaults: makeDefaults())
+        XCTAssertTrue(settings.soundEnabled)
+    }
+
+    func testSoundEnabledPersistsWhenTurnedOff() {
+        let defaults = makeDefaults()
+        do {
+            let settings = AppSettings(defaults: defaults)
+            settings.soundEnabled = false
+        }
+        XCTAssertFalse(AppSettings(defaults: defaults).soundEnabled)
+    }
+
     func testThresholdPersistsRoundTrip() {
         let defaults = makeDefaults()
         do {

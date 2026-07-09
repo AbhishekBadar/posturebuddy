@@ -5,3 +5,4 @@ DerivedData/
 
 # Local AI agent context; not part of the repo
 CLAUDE.md
+.DS_Store

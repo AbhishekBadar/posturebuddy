@@ -17,6 +17,11 @@ struct MenuBarContentView: View {
                 set: { model.setMonitoring($0) }
             ))
 
+            Toggle("Play sound", isOn: Binding(
+                get: { model.isSoundEnabled },
+                set: { model.setSoundEnabled($0) }
+            ))
+
             VStack(alignment: .leading, spacing: 4) {
                 Text("Sensitivity")
                     .font(.subheadline)

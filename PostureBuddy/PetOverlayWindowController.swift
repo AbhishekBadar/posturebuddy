@@ -19,26 +19,33 @@ final class PetOverlayWindowController {
     private var bubbleHost: NSHostingView<SpeechBubbleView>?
     private var isPresented = false
     private var bubbleWorkItem: DispatchWorkItem?
+    private let sound = SoundPlayer(resource: "faaah", withExtension: "mp3")
 
     // MARK: Tunables
     private let gifAspect: CGFloat = 1280.0 / 720.0   // GIF native canvas is 1280x720
     private let maxGifHeight: CGFloat = 360           // on-screen height of the GIF
-    private let bubbleHeadroom: CGFloat = 80          // vertical space above the GIF for the bubble
+    private let bubbleHeadroom: CGFloat = 80          // minimum space above the GIF for the bubble
+    private let bubbleTailOverlap: CGFloat = 6        // how far the tail dips into the GIF, toward the head
     private let bubbleLeadIn: TimeInterval = 1.0      // show the bubble this long before the GIF ends
     private let bubbleFallbackDelay: TimeInterval = 0.8  // used only if the GIF duration is unknown
     private let bubbleHeadFractionX: CGFloat = 0.5    // horizontal anchor over the standing head (0=left,1=right of GIF)
     private let rightBleedFraction: CGFloat = 0.20    // push panel off the right screen edge toward the corner
     private let bottomMargin: CGFloat = 0             // gap between the pet's feet and the screen bottom
 
-    func show() {
+    /// - Parameters:
+    ///   - message: the line the character says; the bubble is sized around it.
+    ///   - playSound: whether to play the sound effect when the character speaks.
+    func show(message: String, playSound: Bool) {
         let panel = ensurePanel()
+        // Set the text before laying out — the bubble's size depends on it.
+        bubbleHost?.rootView = SpeechBubbleView(text: message)
         layout(panel)
 
         // Play the GIF once from frame 0 (the walk-in), then hold the last frame.
         imageView?.playOnce()
 
-        // Bubble stays hidden until the GIF finishes its single play — that's the
-        // moment the character "says" the line — then fades in.
+        // Bubble stays hidden until the character stops walking — that's the moment
+        // it "says" the line — then fades in, with the sound landing on the same beat.
         bubbleHost?.alphaValue = 0
         bubbleWorkItem?.cancel()
         let work = DispatchWorkItem { [weak self] in
@@ -47,6 +54,7 @@ final class PetOverlayWindowController {
                 context.duration = 0.25
                 self.bubbleHost?.animator().alphaValue = 1
             }
+            if playSound { self.sound.play() }
         }
         bubbleWorkItem = work
         let gifDuration = imageView?.totalDuration ?? 0
@@ -65,7 +73,8 @@ final class PetOverlayWindowController {
     func hide() {
         guard let panel, isPresented else { return }
         isPresented = false
-        bubbleWorkItem?.cancel()
+        bubbleWorkItem?.cancel()   // cancels a pending bubble+sound if we hide mid-walk
+        sound.stop()
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.3
             panel.animator().alphaValue = 0
@@ -108,7 +117,9 @@ final class PetOverlayWindowController {
         container.addSubview(iv)
         self.imageView = iv
 
-        let bubble = NSHostingView(rootView: SpeechBubbleView(text: "Sit straight!"))
+        // Placeholder text only; show(message:playSound:) sets the real line and
+        // layout() resizes the bubble around it.
+        let bubble = NSHostingView(rootView: SpeechBubbleView(text: ""))
         bubble.alphaValue = 0
         container.addSubview(bubble)
         self.bubbleHost = bubble
@@ -123,7 +134,15 @@ final class PetOverlayWindowController {
         let vf = screen.visibleFrame
         let gifHeight = min(maxGifHeight, vf.height * 0.5)
         let gifWidth = gifHeight * gifAspect
-        let panelHeight = gifHeight + bubbleHeadroom
+
+        // Measure the bubble first — nag lines vary in length and may wrap to two
+        // lines, so the headroom has to grow to fit rather than clip at the panel top.
+        var bubbleSize = NSSize(width: 170, height: 64)
+        if let fitting = bubbleHost?.fittingSize, fitting.width > 0, fitting.height > 0 {
+            bubbleSize = fitting
+        }
+        let headroom = max(bubbleHeadroom, bubbleSize.height + bubbleTailOverlap + 12)
+        let panelHeight = gifHeight + headroom
 
         // Bottom-right, pushed right so the character enters from the corner
         // (the empty right part of the GIF canvas bleeds off-screen).
@@ -134,13 +153,9 @@ final class PetOverlayWindowController {
         // GIF sits in the bottom region; headroom on top holds the bubble.
         imageView?.frame = NSRect(x: 0, y: 0, width: gifWidth, height: gifHeight)
 
-        if let bubble = bubbleHost {
-            let fitting = bubble.fittingSize
-            let bw = fitting.width > 0 ? fitting.width : 170
-            let bh = fitting.height > 0 ? fitting.height : 64
-            let bx = bubbleHeadFractionX * gifWidth - bw / 2
-            let by = gifHeight - 6   // tail just overlaps the top of the GIF (near the head)
-            bubble.frame = NSRect(x: bx, y: by, width: bw, height: bh)
-        }
+        // Bubble centered over the standing head, tail just overlapping the GIF top.
+        let bx = bubbleHeadFractionX * gifWidth - bubbleSize.width / 2
+        let by = gifHeight - bubbleTailOverlap
+        bubbleHost?.frame = NSRect(origin: NSPoint(x: bx, y: by), size: bubbleSize)
     }
 }

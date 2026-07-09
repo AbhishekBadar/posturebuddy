@@ -15,15 +15,18 @@ final class AppModel: ObservableObject {
     @Published private(set) var connectionState: AirPostureConnectionState = .disconnected
     @Published private(set) var calibrationState: AirPostureCalibrationState = .idle
     @Published var threshold: Double
+    @Published var isSoundEnabled: Bool
 
     /// Threshold slider bounds (degrees). More negative = more tolerant of head tilt.
     let thresholdRange: ClosedRange<Double> = -35.0 ... -5.0
 
     private let overlay = PetOverlayWindowController()
+    private var nagMessages = NagMessages()
     private var cancellables = Set<AnyCancellable>()
 
     init(settings: AppSettings = AppSettings()) {
         self.settings = settings
+        self.isSoundEnabled = settings.soundEnabled
 
         var config = AirPostureConfiguration.default
         config.poorPostureThreshold = settings.poorPostureThreshold
@@ -67,8 +70,11 @@ final class AppModel: ObservableObject {
             .sink { [weak self] state in
                 guard let self else { return }
                 switch state {
-                case .nagging: self.overlay.show()
-                case .hidden:  self.overlay.hide()
+                case .nagging:
+                    self.overlay.show(message: self.nagMessages.next(),
+                                      playSound: self.isSoundEnabled)
+                case .hidden:
+                    self.overlay.hide()
                 }
             }
             .store(in: &cancellables)
@@ -98,6 +104,11 @@ final class AppModel: ObservableObject {
         } else {
             overlay.hide()
         }
+    }
+
+    func setSoundEnabled(_ on: Bool) {
+        isSoundEnabled = on
+        settings.soundEnabled = on
     }
 
     func applyThreshold(_ value: Double) {

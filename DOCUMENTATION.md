@@ -2,8 +2,8 @@
 
 A native macOS **menu-bar app** that watches your sitting posture through your
 **AirPods** and, when you slouch, sends a **pixel-art version of you** walking onto
-your screen to tell you to **"Sit straight!"** — which then fades out once you've
-corrected yourself.
+your screen, yells, and roasts your posture — then fades out once you've corrected
+yourself.
 
 The character is just a bundled GIF, so anyone can drop in a pixel avatar of
 themselves (see §7).
@@ -20,12 +20,14 @@ No camera, no network, no analytics. Everything runs locally.
    computes a personalized head-tilt threshold from the two averages and saves it.
 3. **Monitoring** — with AirPods in, the app continuously reads your head pitch.
    - Slouch past your threshold and *stay* slouched for **5 seconds** → your pixel-art
-     character appears bottom-right: it **walks in from the right edge, stops, stands**,
-     and a **"Sit straight!" speech bubble** pops up ~1 s before the walk animation
-     ends. The character then stays frozen, staring at you.
+     character appears bottom-right: it **walks in from the right edge, stops, stands**.
+     ~1 s before the walk ends, a **speech bubble** pops up with a random roast
+     ("Gravity: 1. You: 0.") and the **sound effect plays on the same beat**. The
+     character then stays frozen, staring at you.
    - Sit up straight and *hold it* for **2 seconds** → the character fades out.
 4. **Menu bar** — click the icon for: connection status, a **Monitor my posture**
-   toggle, a **Sensitivity** slider (Relaxed ↔ Strict), **Recalibrate…**, and Quit.
+   toggle, a **Play sound** toggle, a **Sensitivity** slider (Relaxed ↔ Strict),
+   **Recalibrate…**, and Quit.
 
 The overlay never steals keyboard/mouse focus and is **click-through** — it cannot
 interrupt whatever you're doing.
@@ -69,7 +71,8 @@ interrupt whatever you're doing.
 ┌──────────────────────────┐
 │ PetOverlayWindowController│  borderless, non-activating, click-through
 │   ├─ GIFPlayerView        │  NSPanel bottom-right; plays GIF once & holds
-│   └─ SpeechBubbleView     │  "Sit straight!" bubble, timed to the GIF
+│   ├─ SpeechBubbleView     │  random roast, timed to the GIF
+│   └─ SoundPlayer         │  sound effect, fires with the bubble
 └──────────────────────────┘
 ```
 
@@ -81,11 +84,13 @@ interrupt whatever you're doing.
 | `AppModel` | `PostureBuddy/AppModel.swift` | Central coordinator. Applies the persisted threshold, subscribes to tracker snapshots, feeds `PostureMonitor`, drives the overlay from `PetState`, exposes menu state, and orchestrates calibration (pause nags → run → clamp + save result). |
 | `PostureMonitor` | `PostureBuddy/PostureMonitor.swift` | The nag decision. Pure, injectable-time hysteresis: `.poor` sustained ≥ **5 s** → `.nagging`; then `.good` sustained ≥ **2 s** → `.hidden`. Any disconnect or pause instantly hides and resets. Fully unit-tested. |
 | `PetState` | `PostureBuddy/PetState.swift` | Two-case enum: `.hidden` / `.nagging`. |
-| `AppSettings` | `PostureBuddy/AppSettings.swift` | `UserDefaults` persistence for `poorPostureThreshold` (defaults to −22°) and `hasCalibrated`. Unit-tested. |
+| `AppSettings` | `PostureBuddy/AppSettings.swift` | `UserDefaults` persistence for `poorPostureThreshold` (defaults to −22°), `hasCalibrated`, and `soundEnabled` (defaults to on). Unit-tested. |
 | `PetOverlayWindowController` | `PostureBuddy/PetOverlayWindowController.swift` | The on-screen character. Borderless, transparent, **non-activating**, **click-through** `NSPanel` (floating level, joins all Spaces, works over full-screen apps). Positions bottom-right with the character entering from the screen edge. Fades in/out; schedules the speech bubble. |
 | `GIFPlayerView` | `PostureBuddy/GIFPlayerView.swift` | Custom `NSImageView` that plays the GIF **exactly once and freezes on the last frame** (no looping). Decodes frames on demand with `shouldCache: false` (~one frame in memory). Exposes `totalDuration` from real frame delays. |
-| `SpeechBubbleView` | `PostureBuddy/SpeechBubbleView.swift` | SwiftUI white rounded bubble + tail with the "Sit straight!" text (the GIF art has no text of its own). |
-| `MenuBarContentView` | `PostureBuddy/MenuBarContentView.swift` | Menu-bar popover UI: status, monitor toggle, sensitivity slider (−35…−5°), Recalibrate…, Quit. |
+| `SpeechBubbleView` | `PostureBuddy/SpeechBubbleView.swift` | SwiftUI white rounded bubble + tail holding the nag line (the GIF art has no text of its own). Wraps at 300 pt, so the overlay grows its headroom to fit two-line messages. |
+| `NagMessages` | `PostureBuddy/NagMessages.swift` | The pool of sassy lines. `next()` picks at random but never repeats the same line back-to-back. Unit-tested. |
+| `SoundPlayer` | `PostureBuddy/SoundPlayer.swift` | Retains a prepared `AVAudioPlayer` for `faaah.mp3` and restarts it from 0 on each play. Retention matters — a player that falls out of scope stops instantly. |
+| `MenuBarContentView` | `PostureBuddy/MenuBarContentView.swift` | Menu-bar popover UI: status, monitor toggle, sound toggle, sensitivity slider (−35…−5°), Recalibrate…, Quit. |
 | `CalibrationView` | `PostureBuddy/CalibrationView.swift` | Guided calibration window, driven entirely by the tracker's `calibrationState` (idle → record good → transition → record bad → complete → Save/Discard). |
 | `PostureBuddyApp` | `PostureBuddy/PostureBuddyApp.swift` | `@main`. `MenuBarExtra` (window style) + the calibration `Window` scene + first-run auto-open of calibration. |
 
@@ -114,6 +119,8 @@ The sensitivity slider and calibration both write the same value:
 | GIF | 1280×720, 54 frames, ~3.6 s, transparent background | `Resources/posturebuddy.gif` |
 | GIF playback | Once per appearance, holds last frame | `GIFPlayerView.playOnce()` |
 | Bubble timing | appears **1 s before** the GIF ends | `bubbleLeadIn` |
+| Sound | `faaah.mp3` (~1.9 s), fires **with** the bubble; mutable from the menu | `SoundPlayer`, `AppSettings.soundEnabled` |
+| Nag line | random from `NagMessages.all`, never repeating consecutively | `NagMessages.next()` |
 | Character size / position | ≤360 pt tall, bottom-right, 20% bled off the right edge | overlay tunables |
 | Disconnect / pause | character hides immediately | `PostureMonitor.reset()` |
 
@@ -141,7 +148,7 @@ open PostureBuddy.xcodeproj       # then Run  — or:
 xcodebuild -scheme PostureBuddy -destination 'platform=macOS' build
 ```
 
-Tests (10 app tests + 8 vendored-core tests):
+Tests (15 app tests + 8 vendored-core tests):
 
 ```bash
 xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'
@@ -162,11 +169,13 @@ Notes:
 
 - **Unit-tested (deterministic):** `PostureMonitor` (8 tests — all hysteresis
   transitions, timer resets, disconnect/pause) via injected timestamps, and
-  `AppSettings` (2 tests — default fallback, persistence round-trip) via isolated
-  `UserDefaults` suites. The core package has its own 8 tests using
+  `AppSettings` (4 tests — threshold default/round-trip, sound-enabled default/round-trip)
+  via isolated `UserDefaults` suites, and `NagMessages` (3 tests — no consecutive repeats,
+  every line reachable). The core package has its own 8 tests using
   `MockHeadphoneMotionProvider`.
 - **Manually verified (needs real AirPods + GUI):** character appearance/dismissal,
-  focus/click-through behavior, calibration walkthrough, slider feel.
+  focus/click-through behavior, the sound firing on the same beat as the bubble,
+  calibration walkthrough, slider feel.
 
 ---
 
@@ -182,7 +191,7 @@ posturebuddy/                        (git repo root = the project)
 │   ├── Sources/AirPostureCore/      AirPostureTracker, Types, MotionProvider
 │   └── Tests/AirPostureCoreTests/
 ├── PostureBuddy/                    app sources (see component table)
-│   └── Resources/posturebuddy.gif   the bundled character GIF
+│   └── Resources/                   posturebuddy.gif (character), faaah.mp3 (sound)
 ├── PostureBuddyTests/               PostureMonitorTests, AppSettingsTests
 ├── assets/                          posturebuddy.gif (art source of truth)
 │                                    demo.gif (README preview, opaque bg)
@@ -240,6 +249,12 @@ If your GIF has different proportions, adjust the tunables at the top of
 `rightBleedFraction` (how far into the corner it enters), `bubbleHeadFractionX`
 (bubble position over the head), `bubbleHeadroom`, `bubbleLeadIn` (how long before
 the walk ends the bubble appears), and `bottomMargin`.
+
+**What it says** lives in `NagMessages.all` — edit the array. **What it sounds like**
+is `PostureBuddy/Resources/faaah.mp3`; replace the file (any format `AVAudioPlayer`
+reads) or update the resource name in `PetOverlayWindowController`'s `SoundPlayer`
+initializer. Keep it short — it fires on the same beat as the bubble, roughly a
+second before the character stops moving.
 
 ---
 
