@@ -50,3 +50,9 @@ xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'
   package, MIT licensed) and referenced by `project.yml`; this project has no
   external project dependencies.
 - Depends on nothing over the network; no analytics.
+
+## Credits
+
+The AirPods head-tracking and posture-scoring engine is **AirPostureCore** by
+**Allen Lee**, from the open-source [AirPosture](https://github.com/allenv0/AirPosture)
+iOS app (MIT license — see `AirPostureCore/LICENSE`). Thanks for open-sourcing it.

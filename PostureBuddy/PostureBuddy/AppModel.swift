@@ -27,18 +27,34 @@ final class AppModel: ObservableObject {
 
         var config = AirPostureConfiguration.default
         config.poorPostureThreshold = settings.poorPostureThreshold
+        // PostureBuddy never reads pitchHistory; a 1-element history avoids the
+        // per-sample copy-on-write of a 50-element buffer inside the core.
+        config.pitchHistorySize = 1
         let tracker = AirPostureTracker(configuration: config)
         self.tracker = tracker
         self.monitor = PostureMonitor()
         self.threshold = config.poorPostureThreshold
 
         // Snapshot → connection/calibration state + monitor ingest.
+        //
+        // No receive(on:): the tracker is @MainActor and already publishes on the
+        // main thread — a scheduler hop would only add latency (and RunLoop.main
+        // stalls delivery during UI event tracking, e.g. slider drags).
+        //
+        // The snapshot arrives at sensor rate (~25-40 Hz). ingest must run on
+        // every tick to advance the hysteresis timers, but the @Published
+        // properties are only written on real changes — @Published fires
+        // objectWillChange on every write, and this model drives the MenuBarExtra
+        // scene, so unconditional writes would re-evaluate SwiftUI ~40x/s forever.
         tracker.$snapshot
-            .receive(on: RunLoop.main)
             .sink { [weak self] snapshot in
                 guard let self else { return }
-                self.connectionState = snapshot.connectionState
-                self.calibrationState = snapshot.calibrationState
+                if self.connectionState != snapshot.connectionState {
+                    self.connectionState = snapshot.connectionState
+                }
+                if self.calibrationState != snapshot.calibrationState {
+                    self.calibrationState = snapshot.calibrationState
+                }
                 self.monitor.ingest(quality: snapshot.quality,
                                     connectionState: snapshot.connectionState,
                                     at: Date())
@@ -51,7 +67,7 @@ final class AppModel: ObservableObject {
             .sink { [weak self] state in
                 guard let self else { return }
                 switch state {
-                case .nagging: self.overlay.show(message: "Sit up straight!")
+                case .nagging: self.overlay.show()
                 case .hidden:  self.overlay.hide()
                 }
             }
