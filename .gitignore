@@ -2,3 +2,6 @@
 DerivedData/
 .build/
 *.xcuserstate
+
+# Local AI agent context; not part of the repo
+CLAUDE.md
