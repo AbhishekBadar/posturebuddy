@@ -221,9 +221,11 @@ and per-sample copy-on-write of an unused 50-sample pitch-history buffer.
 - **Footprint:** menu-bar-only (`LSUIElement`), one floating panel when nagging;
   GIF decoding holds ~one 1280×720 frame at a time; UI invalidates only on real
   state changes.
-- **Licensing:** the vendored `AirPostureCore` engine is used under the **MIT
-  license** — the copyright/permission notice at `AirPostureCore/LICENSE` must
-  remain with the code. App-level code has no other third-party dependencies.
+- **Licensing & credits:** the vendored `AirPostureCore` engine was written by
+  **Allen Lee** for the open-source [AirPosture](https://github.com/allenv0/AirPosture)
+  iOS app and is used here under the **MIT license** — the copyright/permission
+  notice at `AirPostureCore/LICENSE` remains with the code. App-level code has
+  no other third-party dependencies.
 
 ## 8. Known limitations / future ideas
 
