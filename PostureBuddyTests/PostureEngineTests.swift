@@ -47,4 +47,61 @@ final class PostureEngineTests: XCTestCase {
         engine.ingest(pitchRadians: radians(-15), at: at(0))
         XCTAssertEqual(engine.snapshot.quality, .poor)
     }
+
+    // MARK: Connection lifecycle
+
+    func testStartMovesDisconnectedToConnecting() {
+        let engine = PostureEngine()
+        XCTAssertEqual(engine.snapshot.connection, .disconnected)
+        engine.start(at: at(0))
+        XCTAssertEqual(engine.snapshot.connection, .connecting)
+    }
+
+    func testFirstSampleConnects() {
+        let engine = PostureEngine()
+        engine.start(at: at(0))
+        engine.ingest(pitchRadians: radians(-10), at: at(1))
+        XCTAssertEqual(engine.snapshot.connection, .connected)
+    }
+
+    func testSampleSilenceDegradesConnectionThenSampleRecovers() {
+        let engine = PostureEngine()
+        engine.start(at: at(0))
+        engine.ingest(pitchRadians: radians(-10), at: at(1))
+
+        engine.tick(at: at(3))     // 2 s silence: still connected
+        XCTAssertEqual(engine.snapshot.connection, .connected)
+
+        engine.tick(at: at(6.5))   // 5.5 s silence: stale
+        XCTAssertEqual(engine.snapshot.connection, .connecting)
+
+        engine.tick(at: at(11.5))  // 10.5 s silence: gone
+        XCTAssertEqual(engine.snapshot.connection, .disconnected)
+
+        engine.ingest(pitchRadians: radians(-10), at: at(12))
+        XCTAssertEqual(engine.snapshot.connection, .connected)
+    }
+
+    func testTickBeforeStartKeepsDisconnected() {
+        let engine = PostureEngine()
+        engine.tick(at: at(60))
+        XCTAssertEqual(engine.snapshot.connection, .disconnected)
+    }
+
+    func testInvalidSampleDoesNotRefreshConnection() {
+        let engine = PostureEngine()
+        engine.start(at: at(0))
+        engine.ingest(pitchRadians: radians(-10), at: at(1))
+        engine.ingest(pitchRadians: Double.nan, at: at(8))  // must not count
+        engine.tick(at: at(8))                              // 7 s since last valid
+        XCTAssertEqual(engine.snapshot.connection, .connecting)
+    }
+
+    func testErrorForcesDisconnected() {
+        let engine = PostureEngine()
+        engine.start(at: at(0))
+        engine.ingest(pitchRadians: radians(-10), at: at(1))
+        engine.noteError()
+        XCTAssertEqual(engine.snapshot.connection, .disconnected)
+    }
 }

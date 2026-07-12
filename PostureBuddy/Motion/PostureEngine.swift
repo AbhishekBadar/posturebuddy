@@ -43,12 +43,16 @@ final class PostureEngine {
     static let thresholdRange: ClosedRange<Double> = -35.0 ... -5.0
 
     private static let filterFactor: Double = 0.4
+    private static let staleInterval: TimeInterval = 5.0
+    private static let disconnectInterval: TimeInterval = 10.0
 
     /// Poor-posture threshold in degrees; filtered pitch below it is a slouch.
     var threshold: Double
 
     private var filteredPitch: Double = 0.0
     private var hasSample = false
+    private var isStarted = false
+    private var lastSampleAt: Date = .distantPast
     private var connection: ConnectionPhase = .disconnected
     private var calibration: CalibrationPhase = .idle
 
@@ -65,6 +69,31 @@ final class PostureEngine {
         )
     }
 
+    /// Motion updates are starting; connection is pending until a sample arrives.
+    func start(at date: Date) {
+        isStarted = true
+        lastSampleAt = date
+        if connection != .connected {
+            connection = .connecting
+        }
+    }
+
+    /// Advances time-based state: connection staleness.
+    func tick(at date: Date) {
+        guard isStarted else { return }
+        let silence = date.timeIntervalSince(lastSampleAt)
+        if silence >= Self.disconnectInterval {
+            connection = .disconnected
+        } else if silence >= Self.staleInterval {
+            connection = .connecting
+        }
+    }
+
+    /// The motion provider reported a failure.
+    func noteError() {
+        connection = .disconnected
+    }
+
     func ingest(pitchRadians: Double, at date: Date) {
         guard pitchRadians.isFinite,
               (-Double.pi ... Double.pi).contains(pitchRadians) else { return }
@@ -74,5 +103,7 @@ final class PostureEngine {
             ? filteredPitch * (1.0 - Self.filterFactor) + pitchDegrees * Self.filterFactor
             : pitchDegrees
         hasSample = true
+        lastSampleAt = date
+        connection = .connected
     }
 }
