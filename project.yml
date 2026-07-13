@@ -5,18 +5,12 @@ options:
     macOS: "14.0"
   createIntermediateGroups: true
 
-packages:
-  AirPostureCore:
-    path: AirPostureCore
-
 targets:
   PostureBuddy:
     type: application
     platform: macOS
     sources:
       - PostureBuddy
-    dependencies:
-      - package: AirPostureCore
     info:
       path: PostureBuddy/Info.plist
       properties:
@@ -42,7 +36,6 @@ targets:
       - PostureBuddyTests
     dependencies:
       - target: PostureBuddy
-      - package: AirPostureCore
     settings:
       base:
         SWIFT_VERSION: "5.9"
