@@ -45,6 +45,8 @@ final class PostureEngine {
     private static let filterFactor: Double = 0.4
     private static let staleInterval: TimeInterval = 5.0
     private static let disconnectInterval: TimeInterval = 10.0
+    private static let samplingDuration: TimeInterval = 5.0
+    private static let pauseDuration: TimeInterval = 3.0
 
     /// Poor-posture threshold in degrees; filtered pitch below it is a slouch.
     var threshold: Double
@@ -55,6 +57,9 @@ final class PostureEngine {
     private var lastSampleAt: Date = .distantPast
     private var connection: ConnectionPhase = .disconnected
     private var calibration: CalibrationPhase = .idle
+    private var phaseStartedAt: Date?
+    private var phaseSamples: [Double] = []
+    private var uprightAverage: Double = 0.0
 
     init(threshold: Double = PostureEngine.defaultThreshold) {
         self.threshold = threshold
@@ -78,7 +83,7 @@ final class PostureEngine {
         }
     }
 
-    /// Advances time-based state: connection staleness.
+    /// Advances time-based state: connection staleness and calibration progress.
     func tick(at date: Date) {
         guard isStarted else { return }
         let silence = date.timeIntervalSince(lastSampleAt)
@@ -87,11 +92,77 @@ final class PostureEngine {
         } else if silence >= Self.staleInterval {
             connection = .connecting
         }
+        advanceCalibration(at: date)
     }
 
     /// The motion provider reported a failure.
     func noteError() {
         connection = .disconnected
+    }
+
+    // MARK: Calibration
+
+    func beginCalibration(at date: Date) {
+        phaseSamples.removeAll()
+        uprightAverage = 0.0
+        calibration = .samplingUpright(progress: 0.0)
+        phaseStartedAt = date
+    }
+
+    func cancelCalibration() {
+        calibration = .idle
+        phaseStartedAt = nil
+        phaseSamples.removeAll()
+    }
+
+    /// Applies and returns the calibrated threshold, or nil if calibration
+    /// hasn't reached `.done`.
+    func saveCalibration() -> Double? {
+        guard case .done(let value) = calibration else { return nil }
+        threshold = value
+        calibration = .idle
+        return value
+    }
+
+    private func advanceCalibration(at date: Date) {
+        guard let phaseStart = phaseStartedAt else { return }
+        let elapsed = date.timeIntervalSince(phaseStart)
+
+        switch calibration {
+        case .samplingUpright:
+            if elapsed >= Self.samplingDuration {
+                uprightAverage = average(of: phaseSamples)
+                phaseSamples.removeAll()
+                calibration = .pause(progress: 0.0)
+                phaseStartedAt = date
+            } else {
+                calibration = .samplingUpright(progress: elapsed / Self.samplingDuration)
+            }
+        case .pause:
+            if elapsed >= Self.pauseDuration {
+                calibration = .samplingSlouch(progress: 0.0)
+                phaseStartedAt = date
+            } else {
+                calibration = .pause(progress: elapsed / Self.pauseDuration)
+            }
+        case .samplingSlouch:
+            if elapsed >= Self.samplingDuration {
+                let midpoint = (uprightAverage + average(of: phaseSamples)) / 2.0
+                let clamped = min(max(midpoint, Self.thresholdRange.lowerBound),
+                                  Self.thresholdRange.upperBound)
+                calibration = .done(threshold: clamped)
+                phaseStartedAt = nil
+                phaseSamples.removeAll()
+            } else {
+                calibration = .samplingSlouch(progress: elapsed / Self.samplingDuration)
+            }
+        case .idle, .done:
+            phaseStartedAt = nil
+        }
+    }
+
+    private func average(of values: [Double]) -> Double {
+        values.isEmpty ? 0.0 : values.reduce(0, +) / Double(values.count)
     }
 
     func ingest(pitchRadians: Double, at date: Date) {
@@ -105,5 +176,12 @@ final class PostureEngine {
         hasSample = true
         lastSampleAt = date
         connection = .connected
+
+        switch calibration {
+        case .samplingUpright, .samplingSlouch:
+            phaseSamples.append(pitchDegrees)
+        default:
+            break
+        }
     }
 }

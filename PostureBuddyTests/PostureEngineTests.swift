@@ -104,4 +104,81 @@ final class PostureEngineTests: XCTestCase {
         engine.noteError()
         XCTAssertEqual(engine.snapshot.connection, .disconnected)
     }
+
+    // MARK: Calibration
+
+    /// Runs begin → upright samples → pause → slouch samples → done.
+    /// uprightDegrees/slouchDegrees are the constant pitch fed in each phase.
+    private func calibrate(_ engine: PostureEngine,
+                           uprightDegrees: Double,
+                           slouchDegrees: Double) {
+        engine.beginCalibration(at: at(0))
+        engine.ingest(pitchRadians: radians(uprightDegrees), at: at(1))
+        engine.ingest(pitchRadians: radians(uprightDegrees), at: at(2))
+        engine.tick(at: at(5))     // upright done → pause
+        engine.tick(at: at(8))     // pause done → samplingSlouch
+        engine.ingest(pitchRadians: radians(slouchDegrees), at: at(9))
+        engine.ingest(pitchRadians: radians(slouchDegrees), at: at(10))
+        engine.tick(at: at(13))    // slouch done → done(threshold:)
+    }
+
+    func testCalibrationWalkthroughPhasesAndProgress() {
+        let engine = PostureEngine()
+        engine.start(at: at(0))
+        engine.beginCalibration(at: at(0))
+        XCTAssertEqual(engine.snapshot.calibration, .samplingUpright(progress: 0.0))
+
+        engine.tick(at: at(2.5))
+        XCTAssertEqual(engine.snapshot.calibration, .samplingUpright(progress: 0.5))
+
+        engine.ingest(pitchRadians: radians(-5), at: at(3))
+        engine.tick(at: at(5))
+        XCTAssertEqual(engine.snapshot.calibration, .pause(progress: 0.0))
+
+        engine.tick(at: at(6.5))
+        XCTAssertEqual(engine.snapshot.calibration, .pause(progress: 0.5))
+
+        engine.tick(at: at(8))
+        XCTAssertEqual(engine.snapshot.calibration, .samplingSlouch(progress: 0.0))
+
+        engine.ingest(pitchRadians: radians(-25), at: at(9))
+        engine.tick(at: at(13))
+        // Midpoint of -5 and -25 = -15.
+        XCTAssertEqual(engine.snapshot.calibration, .done(threshold: -15.0))
+    }
+
+    func testCalibrationClampsToStrictBound() {
+        let engine = PostureEngine()
+        engine.start(at: at(0))
+        calibrate(engine, uprightDegrees: 20, slouchDegrees: 10)  // midpoint +15
+        XCTAssertEqual(engine.snapshot.calibration, .done(threshold: -5.0))
+    }
+
+    func testCalibrationClampsToRelaxedBound() {
+        let engine = PostureEngine()
+        engine.start(at: at(0))
+        calibrate(engine, uprightDegrees: -45, slouchDegrees: -65)  // midpoint -55
+        XCTAssertEqual(engine.snapshot.calibration, .done(threshold: -35.0))
+    }
+
+    func testCancelCalibrationReturnsToIdleWithoutChangingThreshold() {
+        let engine = PostureEngine()
+        engine.start(at: at(0))
+        engine.beginCalibration(at: at(0))
+        engine.tick(at: at(2))
+        engine.cancelCalibration()
+        XCTAssertEqual(engine.snapshot.calibration, .idle)
+        XCTAssertEqual(engine.threshold, PostureEngine.defaultThreshold, accuracy: 0.0001)
+    }
+
+    func testSaveCalibrationAppliesAndReturnsThreshold() {
+        let engine = PostureEngine()
+        engine.start(at: at(0))
+        XCTAssertNil(engine.saveCalibration())  // nothing to save yet
+
+        calibrate(engine, uprightDegrees: -5, slouchDegrees: -25)
+        XCTAssertEqual(engine.saveCalibration() ?? .nan, -15.0, accuracy: 0.0001)
+        XCTAssertEqual(engine.threshold, -15.0, accuracy: 0.0001)
+        XCTAssertEqual(engine.snapshot.calibration, .idle)
+    }
 }
