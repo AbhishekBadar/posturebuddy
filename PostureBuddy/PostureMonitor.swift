@@ -1,5 +1,4 @@
 import Foundation
-import AirPostureCore
 
 /// Applies sustained-slouch hysteresis to raw posture quality and publishes a PetState.
 ///
@@ -25,8 +24,8 @@ final class PostureMonitor: ObservableObject {
         self.recoverySeconds = recoverySeconds
     }
 
-    func ingest(quality: AirPostureQuality,
-                connectionState: AirPostureConnectionState,
+    func ingest(quality: PostureQuality,
+                connectionState: ConnectionPhase,
                 at date: Date) {
         guard isMonitoring, connectionState == .connected else {
             reset()

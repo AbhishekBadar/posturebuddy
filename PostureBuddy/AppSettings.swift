@@ -1,5 +1,4 @@
 import Foundation
-import AirPostureCore
 
 /// Persists PostureBuddy's user configuration in UserDefaults.
 final class AppSettings {
@@ -23,7 +22,7 @@ final class AppSettings {
     var poorPostureThreshold: Double {
         get {
             defaults.object(forKey: Keys.threshold) as? Double
-                ?? AirPostureConfiguration.default.poorPostureThreshold
+                ?? PostureEngine.defaultThreshold
         }
         set { defaults.set(newValue, forKey: Keys.threshold) }
     }

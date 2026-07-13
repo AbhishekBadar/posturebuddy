@@ -1,5 +1,4 @@
 import XCTest
-import AirPostureCore
 @testable import PostureBuddy
 
 @MainActor
@@ -9,9 +8,9 @@ final class PostureMonitorTests: XCTestCase {
     }
 
     private func feed(_ monitor: PostureMonitor,
-                      _ quality: AirPostureQuality,
+                      _ quality: PostureQuality,
                       at seconds: TimeInterval,
-                      connection: AirPostureConnectionState = .connected) {
+                      connection: ConnectionPhase = .connected) {
         let base = Date(timeIntervalSinceReferenceDate: 0)
         monitor.ingest(quality: quality,
                        connectionState: connection,

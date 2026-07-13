@@ -1,24 +1,23 @@
 import Foundation
 import Combine
 import SwiftUI
-import AirPostureCore
 
-/// Central coordinator: wires the AirPostureCore tracker to the PostureMonitor
+/// Central coordinator: wires the posture tracker to the PostureMonitor
 /// and the pet overlay, and exposes menu-bar state.
 @MainActor
 final class AppModel: ObservableObject {
-    let tracker: AirPostureTracker
+    let tracker: PostureTracker
     let monitor: PostureMonitor
     let settings: AppSettings
 
     @Published var isMonitoring: Bool = true
-    @Published private(set) var connectionState: AirPostureConnectionState = .disconnected
-    @Published private(set) var calibrationState: AirPostureCalibrationState = .idle
+    @Published private(set) var connectionState: ConnectionPhase = .disconnected
+    @Published private(set) var calibrationState: CalibrationPhase = .idle
     @Published var threshold: Double
     @Published var isSoundEnabled: Bool
 
     /// Threshold slider bounds (degrees). More negative = more tolerant of head tilt.
-    let thresholdRange: ClosedRange<Double> = -35.0 ... -5.0
+    let thresholdRange: ClosedRange<Double> = PostureEngine.thresholdRange
 
     private let overlay = PetOverlayWindowController()
     private var nagMessages = NagMessages()
@@ -28,15 +27,10 @@ final class AppModel: ObservableObject {
         self.settings = settings
         self.isSoundEnabled = settings.soundEnabled
 
-        var config = AirPostureConfiguration.default
-        config.poorPostureThreshold = settings.poorPostureThreshold
-        // PostureBuddy never reads pitchHistory; a 1-element history avoids the
-        // per-sample copy-on-write of a 50-element buffer inside the core.
-        config.pitchHistorySize = 1
-        let tracker = AirPostureTracker(configuration: config)
+        let tracker = PostureTracker(threshold: settings.poorPostureThreshold)
         self.tracker = tracker
         self.monitor = PostureMonitor()
-        self.threshold = config.poorPostureThreshold
+        self.threshold = tracker.threshold
 
         // Snapshot → connection/calibration state + monitor ingest.
         //
@@ -52,14 +46,14 @@ final class AppModel: ObservableObject {
         tracker.$snapshot
             .sink { [weak self] snapshot in
                 guard let self else { return }
-                if self.connectionState != snapshot.connectionState {
-                    self.connectionState = snapshot.connectionState
+                if self.connectionState != snapshot.connection {
+                    self.connectionState = snapshot.connection
                 }
-                if self.calibrationState != snapshot.calibrationState {
-                    self.calibrationState = snapshot.calibrationState
+                if self.calibrationState != snapshot.calibration {
+                    self.calibrationState = snapshot.calibration
                 }
                 self.monitor.ingest(quality: snapshot.quality,
-                                    connectionState: snapshot.connectionState,
+                                    connectionState: snapshot.connection,
                                     at: Date())
             }
             .store(in: &cancellables)
@@ -79,15 +73,13 @@ final class AppModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        tracker.startMotionUpdates()
+        tracker.start()
     }
 
     var statusText: String {
         switch connectionState {
         case .connected:    return "AirPods connected"
         case .connecting:   return "Connecting to AirPods…"
-        case .reconnecting: return "Reconnecting…"
-        case .error:        return "AirPods error"
         case .disconnected: return "AirPods not connected"
         }
     }
@@ -100,7 +92,7 @@ final class AppModel: ObservableObject {
         isMonitoring = on
         monitor.isMonitoring = on
         if on {
-            tracker.startMotionUpdates()
+            tracker.start()
         } else {
             overlay.hide()
         }
@@ -114,11 +106,11 @@ final class AppModel: ObservableObject {
     func applyThreshold(_ value: Double) {
         let clamped = min(max(value, thresholdRange.lowerBound), thresholdRange.upperBound)
         threshold = clamped
-        tracker.configuration.poorPostureThreshold = clamped
+        tracker.threshold = clamped
         settings.poorPostureThreshold = clamped
     }
 
-    // MARK: Calibration (driven by Task 6's CalibrationView)
+    // MARK: Calibration (driven by CalibrationView)
 
     func startCalibration() {
         monitor.isMonitoring = false
@@ -127,10 +119,10 @@ final class AppModel: ObservableObject {
     }
 
     func saveCalibration() {
-        if tracker.saveCalibrationResult() != nil {
-            // saveCalibrationResult() has written the raw computed threshold into
-            // tracker.configuration; clamp + persist it consistently via applyThreshold.
-            applyThreshold(tracker.configuration.poorPostureThreshold)
+        if let value = tracker.saveCalibration() {
+            // The engine already clamps; route through applyThreshold anyway so
+            // clamping + persistence stay consistent in one place.
+            applyThreshold(value)
             settings.hasCalibrated = true
         }
         monitor.isMonitoring = isMonitoring

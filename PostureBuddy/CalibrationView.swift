@@ -1,9 +1,8 @@
 import SwiftUI
-import AirPostureCore
 
 /// Guided calibration: records good posture, then bad posture, then lets the
 /// user save the computed threshold. State comes from AppModel.calibrationState,
-/// which mirrors the tracker's AirPostureCalibrationState.
+/// which mirrors the tracker's CalibrationPhase.
 struct CalibrationView: View {
     @ObservedObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
@@ -30,16 +29,16 @@ struct CalibrationView: View {
         switch model.calibrationState {
         case .idle:
             Text("We'll measure your good and slouched posture to personalize your threshold. Keep your AirPods in.")
-        case .recordingGoodPosture:
+        case .samplingUpright:
             Text("Sit up straight and hold still…")
                 .font(.headline)
-        case .transition:
+        case .pause:
             Text("Great! Now get ready to slouch…")
                 .font(.headline)
-        case .recordingBadPosture:
+        case .samplingSlouch:
             Text("Now slouch the way you normally do…")
                 .font(.headline)
-        case .complete(_, _, let threshold):
+        case .done(let threshold):
             Text("Done! Your personalized threshold is \(Int(threshold))°.")
                 .font(.headline)
         }
@@ -48,7 +47,7 @@ struct CalibrationView: View {
     @ViewBuilder
     private var progressView: some View {
         switch model.calibrationState {
-        case .recordingGoodPosture(let p), .transition(let p), .recordingBadPosture(let p):
+        case .samplingUpright(let p), .pause(let p), .samplingSlouch(let p):
             ProgressView(value: p)
                 .progressViewStyle(.linear)
                 .frame(width: 260)
@@ -66,12 +65,12 @@ struct CalibrationView: View {
                 Button("Start") { model.startCalibration() }
                     .keyboardShortcut(.defaultAction)
             }
-        case .recordingGoodPosture, .transition, .recordingBadPosture:
+        case .samplingUpright, .pause, .samplingSlouch:
             Button("Cancel") {
                 model.cancelCalibration()
                 dismiss()
             }
-        case .complete:
+        case .done:
             HStack {
                 Button("Discard") {
                     model.cancelCalibration()

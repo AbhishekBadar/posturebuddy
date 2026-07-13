@@ -1,5 +1,4 @@
 import XCTest
-import AirPostureCore
 @testable import PostureBuddy
 
 final class AppSettingsTests: XCTestCase {
@@ -13,7 +12,7 @@ final class AppSettingsTests: XCTestCase {
     func testThresholdDefaultsToCoreDefaultWhenUnset() {
         let settings = AppSettings(defaults: makeDefaults())
         XCTAssertEqual(settings.poorPostureThreshold,
-                       AirPostureConfiguration.default.poorPostureThreshold,
+                       PostureEngine.defaultThreshold,
                        accuracy: 0.0001)
         XCTAssertFalse(settings.hasCalibrated)
     }
