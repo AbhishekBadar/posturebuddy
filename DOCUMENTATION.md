@@ -47,15 +47,16 @@ interrupt whatever you're doing.
    AirPods motion (~25 Hz)
           │
           ▼
-┌─────────────────────────┐   vendored Swift package (AirPostureCore/)
-│  CMHeadphoneMotionProvider │  wraps CMHeadphoneMotionManager
+┌─────────────────────────┐   app target (PostureBuddy/Motion/)
+│  CMHeadphoneMotionSource │  wraps CMHeadphoneMotionManager
 └──────────┬──────────────┘
            ▼
 ┌─────────────────────────┐
-│    AirPostureTracker    │  validates samples, low-pass filters pitch,
-│    (@MainActor, Combine)│  classifies good/poor vs threshold, tracks
-└──────────┬──────────────┘  connection health, runs calibration
-           │  @Published AirPostureSnapshot (quality, connectionState, …)
+│ PostureTracker           │  validates samples, low-pass filters pitch,
+│  + PostureEngine         │  classifies good/poor vs threshold, tracks
+│ (@MainActor, Combine)    │  connection health, runs calibration
+└──────────┬──────────────┘
+           │  @Published PostureSnapshot (quality, connection, …)
            ▼
 ┌─────────────────────────┐   app target (PostureBuddy/PostureBuddy/)
 │        AppModel         │  central coordinator; owns everything below
@@ -80,7 +81,8 @@ interrupt whatever you're doing.
 
 | Unit | File | Responsibility |
 |---|---|---|
-| `AirPostureCore` | `AirPostureCore/` (SPM package) | AirPods motion + posture engine: sample validation, low-pass pitch filter (factor 0.4), good/poor classification (`adjustedPitch < threshold` → poor), connection state machine, guided calibration, session scoring. **Vendored; self-contained; MIT-licensed (see `AirPostureCore/LICENSE`).** |
+| `PostureEngine` | `PostureBuddy/Motion/PostureEngine.swift` | Pure, time-injected posture engine: sample validation, low-pass pitch filter (factor 0.4), good/poor classification (`pitch < threshold` → poor), connection freshness, guided calibration. Fully unit-tested with injected dates. |
+| `PostureTracker` / `CMHeadphoneMotionSource` | `PostureBuddy/Motion/` | `@MainActor` glue: wraps `CMHeadphoneMotionManager`, forwards samples to the engine, owns the 2 s health tick and the 0.1 s calibration-progress tick, publishes `PostureSnapshot` on every sample. |
 | `AppModel` | `PostureBuddy/AppModel.swift` | Central coordinator. Applies the persisted threshold, subscribes to tracker snapshots, feeds `PostureMonitor`, drives the overlay from `PetState`, exposes menu state, and orchestrates calibration (pause nags → run → clamp + save result). |
 | `PostureMonitor` | `PostureBuddy/PostureMonitor.swift` | The nag decision. Pure, injectable-time hysteresis: `.poor` sustained ≥ **5 s** → `.nagging`; then `.good` sustained ≥ **2 s** → `.hidden`. Any disconnect or pause instantly hides and resets. Fully unit-tested. |
 | `PetState` | `PostureBuddy/PetState.swift` | Two-case enum: `.hidden` / `.nagging`. |
@@ -97,12 +99,12 @@ interrupt whatever you're doing.
 ### Data flow (one loop)
 
 `CMHeadphoneMotionManager` sample → validate + low-pass →
-`AirPostureSnapshot` published → `AppModel` sink →
+`PostureSnapshot` published → `AppModel` sink →
 `PostureMonitor.ingest(quality, connectionState, now)` →
 `petState` change → overlay `show()` / `hide()`.
 
 The sensitivity slider and calibration both write the same value:
-`tracker.configuration.poorPostureThreshold` + `AppSettings` (persisted).
+`tracker.threshold` + `AppSettings` (persisted).
 
 ---
 
@@ -112,9 +114,9 @@ The sensitivity slider and calibration both write the same value:
 |---|---|---|
 | Slouch grace before nag | **5.0 s** sustained `.poor` | `PostureMonitor.slouchGraceSeconds` |
 | Recovery before dismiss | **2.0 s** sustained `.good` | `PostureMonitor.recoverySeconds` |
-| Poor-posture rule | `pitch − offset < threshold` | core `updateSnapshot()` |
-| Default threshold | **−22°** (uncalibrated) | `AirPostureConfiguration.default` |
-| Threshold bounds | **−35° … −5°** (slider + calibration clamp) | `AppModel.thresholdRange` |
+| Poor-posture rule | `filteredPitch < threshold` | `PostureEngine.snapshot` |
+| Default threshold | **−22°** (uncalibrated) | `PostureEngine.defaultThreshold` |
+| Threshold bounds | **−35° … −5°** (slider + calibration clamp) | `PostureEngine.thresholdRange` |
 | Slider direction | −35 = Relaxed, −5 = Strict | `MenuBarContentView` |
 | GIF | 1280×720, 54 frames, ~3.6 s, transparent background | `Resources/posturebuddy.gif` |
 | GIF playback | Once per appearance, holds last frame | `GIFPlayerView.playOnce()` |
@@ -148,11 +150,10 @@ open PostureBuddy.xcodeproj       # then Run  — or:
 xcodebuild -scheme PostureBuddy -destination 'platform=macOS' build
 ```
 
-Tests (15 app tests + 8 vendored-core tests):
+Tests (35 tests):
 
 ```bash
 xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'
-(cd AirPostureCore && swift test)
 ```
 
 Notes:
@@ -161,18 +162,18 @@ Notes:
 - `Info.plist` keys (`LSUIElement`, `NSMotionUsageDescription`, versions) are
   declared in `project.yml` → `info.properties`, so regeneration is idempotent.
 - Simulate first run: `defaults delete com.example.posturebuddy`.
-- **Troubleshooting "Missing package product 'AirPostureCore'"** in Xcode: stale
-  package cache. Quit Xcode, `rm -rf ~/Library/Developer/Xcode/DerivedData/PostureBuddy-*`,
-  `xcodegen generate`, reopen. (File ▸ Packages ▸ Reset Package Caches also works.)
 
 ### Testing strategy
 
-- **Unit-tested (deterministic):** `PostureMonitor` (8 tests — all hysteresis
-  transitions, timer resets, disconnect/pause) via injected timestamps, and
-  `AppSettings` (4 tests — threshold default/round-trip, sound-enabled default/round-trip)
-  via isolated `UserDefaults` suites, and `NagMessages` (3 tests — no consecutive repeats,
-  every line reachable). The core package has its own 8 tests using
-  `MockHeadphoneMotionProvider`.
+- **Unit-tested (deterministic):** `PostureEngine` (16 tests — sample validation,
+  filter, quality classification, connection lifecycle, calibration
+  walkthrough/clamping) and `PostureTracker` (4 tests — idempotent start,
+  publish-per-sample invariant) via injected dates and a fake motion source;
+  `PostureMonitor` (8 tests — all hysteresis transitions, timer resets,
+  disconnect/pause) via injected timestamps; `AppSettings` (4 tests — threshold
+  default/round-trip, sound-enabled default/round-trip) via isolated
+  `UserDefaults` suites; and `NagMessages` (3 tests — no consecutive repeats,
+  every line reachable).
 - **Manually verified (needs real AirPods + GUI):** character appearance/dismissal,
   focus/click-through behavior, the sound firing on the same beat as the bubble,
   calibration walkthrough, slider feel.
@@ -186,13 +187,11 @@ posturebuddy/                        (git repo root = the project)
 ├── project.yml                      XcodeGen manifest (app + test targets)
 ├── README.md                        quick-start readme
 ├── DOCUMENTATION.md                 this document
-├── AirPostureCore/                  vendored SPM package (engine) + LICENSE
-│   ├── Package.swift
-│   ├── Sources/AirPostureCore/      AirPostureTracker, Types, MotionProvider
-│   └── Tests/AirPostureCoreTests/
 ├── PostureBuddy/                    app sources (see component table)
+│   ├── Motion/                      PostureEngine, PostureTracker, CMHeadphoneMotionSource
 │   └── Resources/                   posturebuddy.gif (character), faaah.mp3 (sound)
-├── PostureBuddyTests/               PostureMonitorTests, AppSettingsTests
+├── PostureBuddyTests/               PostureEngineTests, PostureTrackerTests,
+│                                    PostureMonitorTests, AppSettingsTests
 ├── assets/                          posturebuddy.gif (art source of truth)
 │                                    demo.gif (README preview, opaque bg)
 ├── docs/superpowers/                design spec + implementation plan (history)
@@ -266,11 +265,8 @@ second before the character stops moving.
 - **Footprint:** menu-bar-only (`LSUIElement`), one floating panel when nagging;
   GIF decoding holds ~one 1280×720 frame at a time; UI invalidates only on real
   state changes.
-- **Licensing & credits:** the vendored `AirPostureCore` engine was written by
-  **Allen Lee** for the open-source [AirPosture](https://github.com/allenv0/AirPosture)
-  iOS app and is used here under the **MIT license** — the copyright/permission
-  notice at `AirPostureCore/LICENSE` remains with the code. App-level code has
-  no other third-party dependencies.
+- **Dependencies:** none — the posture engine is part of the app; no
+  third-party code.
 
 ## 9. Known limitations / future ideas
 

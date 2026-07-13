@@ -14,9 +14,9 @@ straight.
 
 ## How it works
 
-PostureBuddy uses the **AirPostureCore** engine — a self-contained Swift package
-vendored into this project (`AirPostureCore/`, MIT licensed) — to read AirPods
-head-tilt via `CMHeadphoneMotionManager`. When your head stays tilted past your
+PostureBuddy reads AirPods head-tilt via `CMHeadphoneMotionManager` through its
+own small posture engine (`PostureBuddy/Motion/` — sample validation, low-pass
+filtering, posture classification, guided calibration). When your head stays tilted past your
 calibrated threshold for ~5 seconds, your pixel-art character walks in from the
 bottom-right corner of your screen, stops, yells at you, and holds up a speech
 bubble roasting your posture:
@@ -47,8 +47,7 @@ xcodebuild -scheme PostureBuddy -destination 'platform=macOS' build
 ## Test
 
 ```bash
-xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'   # 15 app tests
-(cd AirPostureCore && swift test)                                    # 8 engine tests
+xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'
 ```
 
 ## Menu
@@ -70,13 +69,7 @@ xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'   # 15 app te
   Layout knobs are at the top of `PetOverlayWindowController.swift`.
 - **Make it say your own things.** Edit `NagMessages.all`. The sound effect is
   `PostureBuddy/Resources/faaah.mp3` — replace the file to change it.
-- `AirPostureCore` is vendored locally at `AirPostureCore/` (a self-contained SPM
-  package, MIT licensed) and referenced by `project.yml`; this project has no
-  external project dependencies.
+- The posture engine (`PostureBuddy/Motion/` — filter, classification, connection
+  tracking, calibration) is part of the app target; this project has no external
+  dependencies.
 - Depends on nothing over the network; no analytics.
-
-## Credits
-
-The AirPods head-tracking and posture-scoring engine is **AirPostureCore** by
-**Allen Lee**, from the open-source [AirPosture](https://github.com/allenv0/AirPosture)
-iOS app (MIT license — see `AirPostureCore/LICENSE`). Thanks for open-sourcing it.

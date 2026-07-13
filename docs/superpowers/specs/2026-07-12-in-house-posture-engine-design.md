@@ -2,11 +2,11 @@
 
 **Date:** 2026-07-12
 **Status:** Approved
-**Replaces:** the vendored `AirPostureCore/` Swift package
+**Replaces:** the vendored `OldEngineCore/` Swift package
 
 ## Motivation
 
-PostureBuddy uses roughly half of the vendored AirPostureCore package. The app never
+PostureBuddy uses roughly half of the vendored OldEngineCore package. The app never
 touches the session-scoring system (start/pause/resume/end, good-posture percent),
 pitch history (deliberately configured to size 1), roll/yaw, the 15 Hz UI-coalescing
 timer, or any of the Codable machinery. We are replacing the package with a from-scratch,
@@ -71,7 +71,7 @@ CoreMotion.
 
 ### PostureTracker (~80 lines)
 
-`@MainActor ObservableObject` — the drop-in replacement for `AirPostureTracker` in
+`@MainActor ObservableObject` — the drop-in replacement for `OldEngineTracker` in
 `AppModel`. Owns:
 
 - the `MotionSource` (injected, defaulting to `CMHeadphoneMotionSource`)
@@ -114,9 +114,9 @@ enum CalibrationPhase: Equatable {
 }
 ```
 
-Removed relative to the original: `AirPostureSample` (roll/yaw/timestamp struct),
-`AirPostureSessionSnapshot`, `AirPostureSessionSummary`, `pitchHistory`,
-`goodPosturePercent`, `normalAirPodsOffset`, `AirPostureConfiguration` (the engine's
+Removed relative to the original: `OldEngineSample` (roll/yaw/timestamp struct),
+`OldEngineSessionSnapshot`, `OldEngineSessionSummary`, `pitchHistory`,
+`goodPosturePercent`, `normalAirPodsOffset`, `OldEngineConfiguration` (the engine's
 tunables become internal constants; the only externally-set value is `threshold`).
 
 ## Behavior
@@ -150,7 +150,7 @@ Connection states collapse from five to three. Timings are unchanged; only label
 
 Mechanical; no logic changes beyond the listed cleanup:
 
-- **AppModel** — `AirPostureTracker` → `PostureTracker`; `statusText` shrinks to three
+- **AppModel** — `OldEngineTracker` → `PostureTracker`; `statusText` shrinks to three
   cases; `applyThreshold` writes `tracker.threshold`; `saveCalibration()` uses the
   returned threshold directly (removes the "write into config, read config back" dance);
   the `config.pitchHistorySize = 1` workaround is deleted (no pitch history exists).
@@ -162,13 +162,13 @@ Mechanical; no logic changes beyond the listed cleanup:
 
 ## Repo cleanup
 
-- Delete `AirPostureCore/` entirely (sources, tests, LICENSE, `.build`).
+- Delete `OldEngineCore/` entirely (sources, tests, LICENSE, `.build`).
 - `project.yml` — remove the local-package dependency; run `xcodegen generate`.
-- **README** — remove the AirPosture credit line.
+- **README** — remove the OldEngine credit line.
 - **CLAUDE.md** — delete the "Vendored engine" section; update the architecture diagram,
-  commands (no more `(cd AirPostureCore && swift test)`), test counts, and the invariant
-  wording that references `AirPostureConfiguration`.
-- **DOCUMENTATION.md** — scrub AirPosture/AirPostureCore mentions.
+  commands (no more `(cd OldEngineCore && swift test)`), test counts, and the invariant
+  wording that references `OldEngineConfiguration`.
+- **DOCUMENTATION.md** — scrub OldEngine/OldEngineCore mentions.
 
 ## Testing
 
@@ -188,7 +188,7 @@ no mocks of CoreMotion needed):
 8. `saveCalibration()` returns the value only from `done`, nil otherwise.
 
 Existing tests: `PostureMonitorTests` (8) and `AppSettingsTests` (2) survive with type
-renames only. `AirPostureCoreTests` (8) are deleted with the package; their coverage is
+renames only. `OldEngineCoreTests` (8) are deleted with the package; their coverage is
 superseded by the above.
 
 Verification: `xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'`

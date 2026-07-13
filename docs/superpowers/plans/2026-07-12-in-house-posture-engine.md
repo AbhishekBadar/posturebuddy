@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the vendored `AirPostureCore/` Swift package with a from-scratch, app-owned posture engine (`PostureEngine` + `CMHeadphoneMotionSource` + `PostureTracker`) in the app target, then delete the package and scrub its attribution.
+**Goal:** Replace the vendored `OldEngineCore/` Swift package with a from-scratch, app-owned posture engine (`PostureEngine` + `CMHeadphoneMotionSource` + `PostureTracker`) in the app target, then delete the package and scrub its attribution.
 
 **Architecture:** A pure, time-injected `PostureEngine` (low-pass filter, quality classification, connection freshness, calibration state machine — all driven by `ingest(pitchRadians:at:)` and `tick(at:)` with caller-supplied `Date`s), a thin `CMHeadphoneMotionManager` wrapper behind a `MotionSource` protocol, and a `@MainActor` `PostureTracker` that owns the wall-clock timers and publishes a `PostureSnapshot` after every ingest/tick. `AppModel` wiring shape is unchanged. Spec: `docs/superpowers/specs/2026-07-12-in-house-posture-engine-design.md`.
 
@@ -19,7 +19,7 @@
 - Threshold semantics everywhere: negative degrees; poor posture is `pitch < threshold`; valid range `-35.0 ... -5.0`; **−5 is the strict end, −35 is relaxed**; default **−22.0**.
 - Timings (must not change): low-pass filter factor **0.4**; connection stale after **5 s** of sample silence, disconnected after **10 s**; calibration phases **5 s / 3 s / 5 s**.
 - User-facing wording calls the character a "pixel-art version of you", never a "pet".
-- Do NOT edit anything under `AirPostureCore/` at any point; it is deleted wholesale in Task 6.
+- Do NOT edit anything under `OldEngineCore/` at any point; it is deleted wholesale in Task 6.
 - `CLAUDE.md` is git-ignored (local only) — edit it in Task 7 but never `git add` it.
 
 ---
@@ -891,11 +891,11 @@ git commit -m "feat: add MotionSource wrapper and PostureTracker glue"
 
 **Interfaces:**
 - Consumes: `PostureTracker` (Task 4), `PostureEngine.defaultThreshold` / `PostureEngine.thresholdRange` (Task 1), `PostureQuality` / `ConnectionPhase` / `CalibrationPhase` (Task 1).
-- Produces: `PostureMonitor.ingest(quality: PostureQuality, connectionState: ConnectionPhase, at: Date)` — same behavior, new types. After this task the app no longer references `AirPostureCore` anywhere; the package is still linked but unused.
+- Produces: `PostureMonitor.ingest(quality: PostureQuality, connectionState: ConnectionPhase, at: Date)` — same behavior, new types. After this task the app no longer references `OldEngineCore` anywhere; the package is still linked but unused.
 
 - [ ] **Step 1: Update the two test files first (red)**
 
-In `PostureBuddyTests/PostureMonitorTests.swift`: delete the line `import AirPostureCore`, and change the `feed` helper's parameter types:
+In `PostureBuddyTests/PostureMonitorTests.swift`: delete the line `import OldEngineCore`, and change the `feed` helper's parameter types:
 
 ```swift
     private func feed(_ monitor: PostureMonitor,
@@ -911,7 +911,7 @@ In `PostureBuddyTests/PostureMonitorTests.swift`: delete the line `import AirPos
 
 (All test bodies are unchanged — `.poor`, `.good`, and `.disconnected` literals resolve against the new types.)
 
-In `PostureBuddyTests/AppSettingsTests.swift`: delete the line `import AirPostureCore`, and in `testThresholdDefaultsToCoreDefaultWhenUnset` replace `AirPostureConfiguration.default.poorPostureThreshold` with `PostureEngine.defaultThreshold`.
+In `PostureBuddyTests/AppSettingsTests.swift`: delete the line `import OldEngineCore`, and in `testThresholdDefaultsToCoreDefaultWhenUnset` replace `OldEngineConfiguration.default.poorPostureThreshold` with `PostureEngine.defaultThreshold`.
 
 - [ ] **Step 2: Run the suite to verify it fails**
 
@@ -919,7 +919,7 @@ In `PostureBuddyTests/AppSettingsTests.swift`: delete the line `import AirPostur
 xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'
 ```
 
-Expected: **BUILD FAILURE** — `PostureMonitor.ingest` still takes `AirPostureQuality`, so the updated tests don't type-check.
+Expected: **BUILD FAILURE** — `PostureMonitor.ingest` still takes `OldEngineQuality`, so the updated tests don't type-check.
 
 - [ ] **Step 3: Rewrite the four app files**
 
@@ -1225,7 +1225,7 @@ struct CalibrationView: View {
 }
 ```
 
-In `PostureBuddy/AppSettings.swift`: delete the line `import AirPostureCore`, and in `poorPostureThreshold`'s getter replace `AirPostureConfiguration.default.poorPostureThreshold` with `PostureEngine.defaultThreshold`.
+In `PostureBuddy/AppSettings.swift`: delete the line `import OldEngineCore`, and in `poorPostureThreshold`'s getter replace `OldEngineConfiguration.default.poorPostureThreshold` with `PostureEngine.defaultThreshold`.
 
 - [ ] **Step 4: Run the full suite to verify it passes**
 
@@ -1236,7 +1236,7 @@ xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'
 Expected: **TEST SUCCEEDED** — all classes pass (PostureEngineTests 16, PostureTrackerTests 4, PostureMonitorTests 8, AppSettingsTests 4, NagMessagesTests). Also confirm no app source still references the old module:
 
 ```bash
-grep -rn "AirPosture" PostureBuddy/ PostureBuddyTests/ --include="*.swift"
+grep -rn "OldEngine" PostureBuddy/ PostureBuddyTests/ --include="*.swift"
 ```
 
 Expected: no output.
@@ -1250,11 +1250,11 @@ git commit -m "refactor: rewire app onto in-house PostureTracker"
 
 ---
 
-### Task 6: Remove the AirPostureCore package
+### Task 6: Remove the OldEngineCore package
 
 **Files:**
 - Modify: `project.yml`
-- Delete: `AirPostureCore/` (entire directory, including LICENSE and `.build`)
+- Delete: `OldEngineCore/` (entire directory, including LICENSE and `.build`)
 
 **Interfaces:**
 - Consumes: Task 5 (no source references remain).
@@ -1266,17 +1266,17 @@ Remove the whole `packages:` block:
 
 ```yaml
 packages:
-  AirPostureCore:
-    path: AirPostureCore
+  OldEngineCore:
+    path: OldEngineCore
 ```
 
-Remove `- package: AirPostureCore` from the `PostureBuddy` target's `dependencies:` (leaving the key absent — it has no other entries), and remove the same line from `PostureBuddyTests`' `dependencies:` (leaving `- target: PostureBuddy`).
+Remove `- package: OldEngineCore` from the `PostureBuddy` target's `dependencies:` (leaving the key absent — it has no other entries), and remove the same line from `PostureBuddyTests`' `dependencies:` (leaving `- target: PostureBuddy`).
 
 - [ ] **Step 2: Delete the package**
 
 ```bash
-git rm -r AirPostureCore
-rm -rf AirPostureCore   # clears the untracked .build directory git rm leaves behind
+git rm -r OldEngineCore
+rm -rf OldEngineCore   # clears the untracked .build directory git rm leaves behind
 ```
 
 - [ ] **Step 3: Regenerate and run the full suite**
@@ -1286,13 +1286,13 @@ xcodegen generate
 xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'
 ```
 
-Expected: **TEST SUCCEEDED**. If Xcode (not xcodebuild) later complains "Missing package product 'AirPostureCore'", that's the stale-DerivedData gotcha: `rm -rf ~/Library/Developer/Xcode/DerivedData/PostureBuddy-*` and regenerate.
+Expected: **TEST SUCCEEDED**. If Xcode (not xcodebuild) later complains "Missing package product 'OldEngineCore'", that's the stale-DerivedData gotcha: `rm -rf ~/Library/Developer/Xcode/DerivedData/PostureBuddy-*` and regenerate.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add project.yml
-git commit -m "chore: remove vendored AirPostureCore package"
+git commit -m "chore: remove vendored OldEngineCore package"
 ```
 
 (`git rm` already staged the deletions.)
@@ -1308,11 +1308,11 @@ git commit -m "chore: remove vendored AirPostureCore package"
 
 **Interfaces:**
 - Consumes: the final code shape from Tasks 1–6.
-- Produces: docs with no AirPosture/AirPostureCore/Allen Lee mentions.
+- Produces: docs with no OldEngine/OldEngineCore/author mentions.
 
 - [ ] **Step 1: README.md**
 
-1. Replace the first paragraph of "How it works" (the sentence spanning "PostureBuddy uses the **AirPostureCore** engine … head-tilt via `CMHeadphoneMotionManager`.") so the section starts:
+1. Replace the first paragraph of "How it works" (the sentence spanning "PostureBuddy uses the **OldEngineCore** engine … head-tilt via `CMHeadphoneMotionManager`.") so the section starts:
 
    > PostureBuddy reads AirPods head-tilt via `CMHeadphoneMotionManager` through its own small posture engine (`PostureBuddy/Motion/`). When your head stays tilted past your calibrated threshold for ~5 seconds, …
 
@@ -1324,7 +1324,7 @@ git commit -m "chore: remove vendored AirPostureCore package"
    ```
 
    and drop the `# 15 app tests` comment (counts drift; say nothing).
-3. In "Notes", replace the `AirPostureCore` bullet ("- `AirPostureCore` is vendored locally … no external project dependencies.") with:
+3. In "Notes", replace the `OldEngineCore` bullet ("- `OldEngineCore` is vendored locally … no external project dependencies.") with:
 
    > - The posture engine (`PostureBuddy/Motion/` — filter, classification, connection tracking, calibration) is part of the app target; this project has no external dependencies.
 4. Delete the entire "## Credits" section.
@@ -1332,27 +1332,27 @@ git commit -m "chore: remove vendored AirPostureCore package"
 - [ ] **Step 2: DOCUMENTATION.md**
 
 1. **Architecture diagram (§2):** replace the top two boxes and their annotations:
-   - `┌ CMHeadphoneMotionProvider ┐  wraps CMHeadphoneMotionManager` box annotation "vendored Swift package (AirPostureCore/)" → "app target (PostureBuddy/Motion/)"
+   - `┌ CMHeadphoneMotionProvider ┐  wraps CMHeadphoneMotionManager` box annotation "vendored Swift package (OldEngineCore/)" → "app target (PostureBuddy/Motion/)"
    - `CMHeadphoneMotionProvider` → `CMHeadphoneMotionSource`
-   - `AirPostureTracker` → `PostureTracker` + `PostureEngine` (keep the same responsibility caption: "validates samples, low-pass filters pitch, classifies good/poor vs threshold, tracks connection health, runs calibration")
-   - `@Published AirPostureSnapshot (quality, connectionState, …)` → `@Published PostureSnapshot (quality, connection, …)`
-2. **Components table (§2):** replace the `AirPostureCore` row with two rows:
+   - `OldEngineTracker` → `PostureTracker` + `PostureEngine` (keep the same responsibility caption: "validates samples, low-pass filters pitch, classifies good/poor vs threshold, tracks connection health, runs calibration")
+   - `@Published OldEngineSnapshot (quality, connectionState, …)` → `@Published PostureSnapshot (quality, connection, …)`
+2. **Components table (§2):** replace the `OldEngineCore` row with two rows:
 
    | `PostureEngine` | `PostureBuddy/Motion/PostureEngine.swift` | Pure, time-injected posture engine: sample validation, low-pass pitch filter (factor 0.4), good/poor classification (`pitch < threshold` → poor), connection freshness, guided calibration. Fully unit-tested with injected dates. |
    | `PostureTracker` / `CMHeadphoneMotionSource` | `PostureBuddy/Motion/` | `@MainActor` glue: wraps `CMHeadphoneMotionManager`, forwards samples to the engine, owns the 2 s health tick and the 0.1 s calibration-progress tick, publishes `PostureSnapshot` on every sample. |
 
-3. **Data flow (§2):** `AirPostureSnapshot` → `PostureSnapshot`; the closing sentence "…write the same value: `tracker.configuration.poorPostureThreshold` + `AppSettings`" → "…write the same value: `tracker.threshold` + `AppSettings` (persisted)."
-4. **Timings table (§3):** `Poor-posture rule` row's Where column `core updateSnapshot()` → `PostureEngine.snapshot`; `Default threshold` row's Where column `AirPostureConfiguration.default` → `PostureEngine.defaultThreshold`; `Threshold bounds` Where column → `PostureEngine.thresholdRange`.
-5. **Tests section (§4-ish, "Tests (15 app tests + 8 vendored-core tests)"):** heading text → "Tests:"; delete the `(cd AirPostureCore && swift test)` line; delete the "Missing package product 'AirPostureCore'" troubleshooting bullet entirely.
+3. **Data flow (§2):** `OldEngineSnapshot` → `PostureSnapshot`; the closing sentence "…write the same value: `tracker.configuration.poorPostureThreshold` + `AppSettings`" → "…write the same value: `tracker.threshold` + `AppSettings` (persisted)."
+4. **Timings table (§3):** `Poor-posture rule` row's Where column `core updateSnapshot()` → `PostureEngine.snapshot`; `Default threshold` row's Where column `OldEngineConfiguration.default` → `PostureEngine.defaultThreshold`; `Threshold bounds` Where column → `PostureEngine.thresholdRange`.
+5. **Tests section (§4-ish, "Tests (15 app tests + 8 vendored-core tests)"):** heading text → "Tests:"; delete the `(cd OldEngineCore && swift test)` line; delete the "Missing package product 'OldEngineCore'" troubleshooting bullet entirely.
 6. **Testing strategy:** add `PostureEngine` (16 tests — validation, filter, quality, connection lifecycle, calibration walkthrough/clamping) and `PostureTracker` (4 tests — idempotent start, publish-per-sample invariant) to the unit-tested list; delete the sentence "The core package has its own 8 tests using `MockHeadphoneMotionProvider`."
-7. **Project layout (§5):** delete the four `AirPostureCore/` tree lines; under `PostureBuddy/` add a line `│   ├── Motion/                      PostureEngine, PostureTracker, CMHeadphoneMotionSource`; in the `PostureBuddyTests/` line append `PostureEngineTests, PostureTrackerTests`.
+7. **Project layout (§5):** delete the four `OldEngineCore/` tree lines; under `PostureBuddy/` add a line `│   ├── Motion/                      PostureEngine, PostureTracker, CMHeadphoneMotionSource`; in the `PostureBuddyTests/` line append `PostureEngineTests, PostureTrackerTests`.
 8. **§8 Licensing & credits:** replace the whole "Licensing & credits" bullet with:
 
    > - **Dependencies:** none — the posture engine is part of the app; no third-party code.
 9. Sanity check:
 
    ```bash
-   grep -rn "AirPosture\|Allen" README.md DOCUMENTATION.md
+   grep -rn "OldEngine" README.md DOCUMENTATION.md
    ```
 
    Expected: no output.
@@ -1360,18 +1360,18 @@ git commit -m "chore: remove vendored AirPostureCore package"
 - [ ] **Step 3: CLAUDE.md (local only — do not commit)**
 
 1. "What this is": no change needed (doesn't name the engine).
-2. **Commands:** delete the `(cd AirPostureCore && swift test)` line; update the test count comment to match reality after Task 6 (run the suite and use the reported number).
-3. **Architecture:** update the pipeline diagram to `CMHeadphoneMotionSource → PostureTracker/PostureEngine → @Published PostureSnapshot → AppModel → PostureMonitor → PetOverlayWindowController`; replace the `AirPostureCore/` bullet with a bullet describing `PostureBuddy/Motion/` (pure time-injected engine + tracker glue, fully unit-tested).
+2. **Commands:** delete the `(cd OldEngineCore && swift test)` line; update the test count comment to match reality after Task 6 (run the suite and use the reported number).
+3. **Architecture:** update the pipeline diagram to `CMHeadphoneMotionSource → PostureTracker/PostureEngine → @Published PostureSnapshot → AppModel → PostureMonitor → PetOverlayWindowController`; replace the `OldEngineCore/` bullet with a bullet describing `PostureBuddy/Motion/` (pure time-injected engine + tracker glue, fully unit-tested).
 4. **Invariants:** the `@Published`/ingest/receive(on:) invariants stay; delete the `config.pitchHistorySize = 1` invariant (no pitch history exists); reword the calibration-clamp invariant: the engine clamps, and `saveCalibration()` still routes through `applyThreshold()` for consistent persistence.
-5. **Delete the whole "Vendored engine (`AirPostureCore/`)" section.**
+5. **Delete the whole "Vendored engine (`OldEngineCore/`)" section.**
 6. **Testing:** replace the bullet list with: `PostureEngineTests` (16), `PostureTrackerTests` (4), `PostureMonitorTests` (8), `AppSettingsTests` (4), `NagMessagesTests`; keep the "Not covered / do not claim GUI passes" wording.
-7. **Gotchas:** delete the "Missing package product 'AirPostureCore'" bullet and the `AirPostureCore/.build` sibling-directory note.
+7. **Gotchas:** delete the "Missing package product 'OldEngineCore'" bullet and the `OldEngineCore/.build` sibling-directory note.
 
 - [ ] **Step 4: Commit (tracked docs only)**
 
 ```bash
 git add README.md DOCUMENTATION.md
-git commit -m "docs: describe the in-house posture engine, drop AirPostureCore references"
+git commit -m "docs: describe the in-house posture engine, drop OldEngineCore references"
 ```
 
 Verify CLAUDE.md was not staged: `git status --short` must not list it.
@@ -1384,7 +1384,7 @@ Verify CLAUDE.md was not staged: `git status --short` must not list it.
 xcodegen generate
 xcodebuild -scheme PostureBuddy -destination 'platform=macOS' build 2>&1 | grep "warning:" | grep -v appintents   # expect: empty
 xcodebuild test -scheme PostureBuddy -destination 'platform=macOS'                                                # expect: TEST SUCCEEDED
-grep -rn "AirPosture" --include="*.swift" --include="*.yml" --include="*.md" . | grep -v docs/superpowers | grep -v CLAUDE.md   # expect: empty
+grep -rn "OldEngine" --include="*.swift" --include="*.yml" --include="*.md" . | grep -v docs/superpowers | grep -v CLAUDE.md   # expect: empty
 ```
 
 Manual verification (needs real AirPods + GUI — **do not claim these pass; ask the user**): menu status transitions, calibration walkthrough (progress bars, Save/Discard), nag appears after 5 s slouch and dismisses after 2 s recovery, sensitivity slider still labeled Relaxed↔Strict with live status updates during drag.
